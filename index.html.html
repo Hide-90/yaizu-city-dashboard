@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>焼津市 観光AIダッシュボード (2025-12-18 to 2025-12-23)</title>
+
+  <!-- Libraries via CDN (single-file HTML; no build step) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.2/wordcloud2.min.js"></script>
+
+  <style>
+    :root {
+      /* Base */
+      --bg: #ffffff;
+      --card: #ffffff;
+      --card2: #f9fafb;
+      --border: #d1d5db;
+
+      /* Text (punchy) */
+      --text: #111111;     /* main */
+      --textSub: #374151;  /* secondary */
+      --muted: #6b7280;    /* muted */
+
+      /* Accents */
+      --accent: #2563eb;   /* blue */
+      --good: #16a34a;     /* green */
+      --warn: #d97706;     /* amber */
+      --bad: #dc2626;      /* red */
+      --purple: #7c3aed;   /* purple */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 20px 20px 10px 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(10px);
+      background: rgba(255,255,255,0.9);
+      z-index: 10;
+    }
+    .title-row {
+      display: flex;
+      gap: 14px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.2px;
+      color: var(--text);
+      font-weight: 900;
+    }
+    .subtitle {
+      color: var(--textSub);
+      font-size: 13px;
+    }
+    main {
+      padding: 18px 20px 28px 20px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(17,24,39,0.08);
+    }
+    .card h2 {
+      margin: 0 0 10px 0;
+      font-size: 15px;
+      color: var(--text);
+      letter-spacing: 0.2px;
+      font-weight: 800;
+      border-left: 5px solid var(--accent);
+      padding-left: 10px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .kpi {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 12px;
+    }
+    .kpi .label { font-size: 12px; color: var(--textSub); margin-bottom: 6px; font-weight: 700; }
+    .kpi .value { font-size: 28px; font-weight: 900; line-height: 1.05; color: var(--text); }
+    .kpi .note { margin-top: 6px; font-size: 11px; color: var(--muted); }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--textSub);
+      font-size: 12px;
+      user-select: none;
+      font-weight: 700;
+    }
+    .pill b { color: var(--text); font-weight: 600; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .small { font-size: 12px; color: var(--textSub); line-height: 1.5; }
+    .col-12 { grid-column: span 12; }
+    .col-7 { grid-column: span 7; }
+    .col-6 { grid-column: span 6; }
+    .col-5 { grid-column: span 5; }
+
+    canvas { width: 100% !important; height: 320px !important; }
+    #sankey { width: 100%; height: 360px; background:#ffffff; border:1px solid var(--border); border-radius:12px; }
+    #wordcloud {
+      width: 100%;
+      height: 360px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: #ffffff;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td {
+      padding: 8px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: rgba(255,255,255,0.75); font-weight: 600; }
+    .hint {
+      color: var(--textSub);
+      font-size: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      line-height: 1.55;
+    }
+    .warn { border-left: 5px solid var(--warn); }
+
+    @media (max-width: 980px) {
+      .kpis { grid-template-columns: repeat(2,1fr); }
+      .col-7,.col-6,.col-5 { grid-column: span 12; }
+      canvas { height: 280px !important; }
+      #sankey, #wordcloud {
+      width: 100%;
+      height: 360px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: #ffffff;
+    }
+    }
+  
+    .bar-legend{
+      display:flex; gap:14px; flex-wrap:wrap; align-items:center;
+      margin:10px 0 6px 0; color: var(--muted); font-size:12px;
+    }
+    .swatch{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:middle;}
+    .swatch-views{background:#2563eb;}
+    .swatch-actions{background:#16a34a;}
+    .swatch-chat{background:#7c3aed;}
+    .spotbars{
+      display:flex; flex-direction:column; gap:10px; margin-top:10px;
+    }
+    .spotrow{
+      display:grid;
+      grid-template-columns: 180px 1fr;
+      gap:12px;
+      align-items:center;
+    }
+    .spotname{
+      font-weight:700; color: var(--text);
+    }
+    .barcols{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:14px;
+      align-items:center;
+    }
+    .barcell{
+      position:relative;
+      height:26px;
+      border-radius:10px;
+      background: #f3f4f6;
+      border: 1px solid var(--border);
+      overflow:hidden;
+    }
+    .barfill{
+      height:100%;
+      border-radius:10px;
+    }
+    .barlabel{
+      position:absolute;
+      right:8px;
+      top:50%;
+      transform:translateY(-50%);
+      font-size:12px;
+      color:#111827;
+      font-weight:700;
+      text-shadow:none;
+      mix-blend-mode: normal;
+    }
+    .barcell small{
+      position:absolute;
+      left:8px;
+      top:50%;
+      transform:translateY(-50%);
+      font-size:11px;
+      color: rgba(17,24,39,0.7);
+    }
+    @media (max-width: 980px) {
+      .spotrow{grid-template-columns: 1fr; gap:6px;}
+      .barcols{grid-template-columns: 1fr; gap:8px;}
+    }
+
+  </style>
+</head>
+<body>
+<header>
+  <div class="title-row">
+    <div>
+      <h1>焼津市 観光AIダッシュボード</h1>
+      <div class="subtitle">対象週：2025年12月18日 → 12月23日（JST表示）・データ：LP表示／ページ内操作／チャットログ</div>
+    </div>
+    <div class="row">
+      <span class="pill"><b>スポット</b> <span id="spotFilterLabel">すべて</span></span>
+      <span class="pill"><b>人数構成</b> <span id="partyFilterLabel">すべて</span></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+
+    <section class="card col-12">
+      <h2>サマリー</h2>
+      <div class="kpis" id="kpiCards"></div>
+      <div style="margin-top:10px" class="hint warn" id="integrationNote"></div>
+    </section>
+
+    <section class="card col-7">
+      <h2>スポット別・言語別 LP表示数</h2>
+      <canvas id="pvChart"></canvas>
+      <div class="small">出典：GA4／LP表示集計（spot_id × 言語）・指標：表示イベント数 Metric shown: Events (views).</div>
+    </section>
+
+    <section class="card col-5">
+      <h2>スポット別・人数構成別 ページ内操作数</h2>
+      <canvas id="actionsChart"></canvas>
+      <div class="small">出典：ページ内操作ログ（人数ボタン）・指標：操作イベント数 Metric shown: Action events.</div>
+    </section>
+
+    
+    <section class="card col-12">
+      <h2>スポット別 重要3指標（LP表示・ページ内操作・チャット）</h2>
+      <div class="small">※「チャット」は暫定的に“ページ内操作時刻に最も近いチャット開始（±30分）”で紐付けた部分一致です。</div>
+      <div class="bar-legend">
+        <div><span class="swatch swatch-views"></span>LP表示</div>
+        <div><span class="swatch swatch-actions"></span>ページ内操作</div>
+        <div><span class="swatch swatch-chat"></span>チャット（部分一致）</div>
+      </div>
+      <div id="spotBars"></div>
+    </section>
+<section class="card col-12">
+      <h2>統合フロー（補足：流れの確認）</h2>
+      <div id="sankey"></div>
+      <div class="small">チャットの紐付けは、ページ内操作の時刻に最も近いチャット開始（±30分）で暫定対応（部分一致）。太さはイベント数を表します。</div>
+    </section>
+
+    <section class="card col-6">
+      <h2>チャット：人数構成の分布（初回入力／ボタン）</h2>
+      <canvas id="partyChart"></canvas>
+      <div class="small">※「unknown」は、初回ユーザー発話に人数ボタン情報が含まれないセッションです。</div>
+    </section>
+
+    <section class="card col-6">
+      <h2>チャット：質問カテゴリ（ユーザー発話のみ）</h2>
+      <canvas id="catChart"></canvas>
+      <div class="small">キーワードによる簡易分類（週次トレンド把握向け）</div>
+    </section>
+
+    <section class="card col-12">
+      <h2>ワードクラウド（ユーザーの質問）</h2>
+      <div id="wordcloud"></div>
+      <div class="small">ユーザー質問から抽出した語（URLや定型謝辞は除外）。日本語は複合語、英語・韓国語は単語単位。</div>
+    </section>
+
+    <section class="card col-12">
+      <h2>週次スナップショット（確認用）</h2>
+      <div class="grid" style="gap:10px">
+        <div class="col-6">
+          <div class="hint">
+            <b>LP表示（イベント数／ユーザー数）</b><br/>
+            <table id="pvTable"></table>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="hint">
+            <b>ページ内操作数 (events)</b><br/>
+            <table id="actionsTable"></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script>
+  // Embedded data (Week-only)
+  const DATA = {"meta":{"week_start":"2025-12-18","week_end":"2025-12-23","timezone":"UTC (source timestamps); display JST(+09:00)","generated_at":"2025-12-24 04:32:58 JST","actions_rows_in_file":24},"pv":{"bySpotLang":[{"spot":"sakana-center","lang":"Japanese","events":33,"users":9},{"spot":"sakana-center","lang":"Swedish","events":2,"users":1},{"spot":"migiwaya","lang":"Korean","events":15,"users":2},{"spot":"tourist-information-center","lang":"Japanese","events":6,"users":2}],"totals":{"events":56,"users":14}},"actions":{"events":24,"bySpotParty":[{"spot_id":"migiwaya","party_mapped":"2","actions":4},{"spot_id":"sakana-center","party_mapped":"1","actions":2},{"spot_id":"sakana-center","party_mapped":"2","actions":5},{"spot_id":"sakana-center","party_mapped":"3-5","actions":5},{"spot_id":"sakana-center","party_mapped":"group","actions":2},{"spot_id":"tourist-information-center","party_mapped":"1","actions":6}]},"chat":{"conversations_total":39,"user_messages_total":103,"query_messages_total":23,"party_distribution":[{"party":"unknown","conversations":20},{"party":"solo","conversations":11},{"party":"family","conversations":7},{"party":"group","conversations":1}],"query_category_counts":[{"category":"access/time","count":4},{"category":"atmosphere/photo","count":1},{"category":"events","count":3},{"category":"food/shopping","count":2},{"category":"hours/reservation","count":1},{"category":"other","count":12}],"wordcloud":[["焼津",6],["ヤイヅ",2],["焼津温泉",2],["焼津まちなかレンタサイクル",2],["焼津市ハイキングマップ",2],["焼津さくらマップ",2],["富士山絶景ポイント",2],["大井川港の桜えび",2],["写真の街",2],["小泉八雲が愛したまち",2],["焼津市観光協会",2],["meets",2],["日間の運行だったようです",1],["現在は運行していないと思われますので使用をおすすめしないでください",1],["おすすめのお店は",1],["代わりの交通手段は",1],["미기와야",1],["근처",1],["맛있는",1],["말차",1],["카페는",1],["夕飯を食べるところはありますか",1],["さかなセンタ",1],["のお休みはいつですか",1],["イベントは",1],["どのイベントについてもっと詳しく知りたいですか",1],["オススメでお願い",1],["イルミネ",1],["ションへの行き方",1],["何回何回もお聞きしありがとう",1],["サンプル作りをやりたいんですけど",1],["時間がない時どうすれば",1],["どれがいい",1],["特集一覧",1],["焼津市を満喫する",1],["遊ぶ",1],["見る",1],["泊まる",1],["食べる",1],["買う",1],["焼津市を巡る",1],["焼津市を知る",1],["焼津観光の魅力",1],["年間行事",1],["フォトライブラリ",1],["焼津市ロケツ",1],["リズム事業",1],["お知らせ",1],["焼津の魅力",1],["焼津へのアクセス",1],["マップ",1],["パンフレット",1],["焼津市観光協会のご案内",1],["会員紹介",1],["会員募集",1],["お問い合わせ",1],["お役立ちリンク集",1],["プライバシ",1],["ポリシ",1],["一般社団法人",1]]},"integration":{"matched_conversations_total":6,"matched_by_spot":[{"spot":"migiwaya","matched_conversations":1},{"spot":"sakana-center","matched_conversations":2},{"spot":"tourist-information-center","matched_conversations":3}],"flow_by_spot":[{"spot":"migiwaya","lp_views":15,"page_actions":4,"matched_chats":1},{"spot":"sakana-center","lp_views":35,"page_actions":14,"matched_chats":2},{"spot":"tourist-information-center","lp_views":6,"page_actions":6,"matched_chats":3}],"matching_note":"チャットは「ページ内操作時刻に最も近いチャット開始（±30分）」で紐付け（部分一致）。"}};
+  // --- simple filters (client-side) ---
+  let spotFilter = "all";
+  let partyFilter = "all";
+
+  function setFilter(kind, value) {
+    if (kind === "spot") spotFilter = value;
+    if (kind === "party") partyFilter = value;
+    document.getElementById("spotFilterLabel").textContent = (spotFilter==="all") ? "All" : spotFilter;
+    document.getElementById("partyFilterLabel").textContent = (partyFilter==="all") ? "All" : partyFilter;
+    renderAll();
+  }
+
+  // --- KPI cards ---
+  function buildKPIs() {
+    const pv = DATA.pv.totals;
+    const actions = DATA.actions.events;
+    const chats = DATA.chat.conversations_total;
+    const queries = DATA.chat.query_messages_total;
+    const matched = DATA.integration.matched_conversations_total;
+
+    const cards = [
+      { label: "LP アクティブユーザー数", value: pv.users, note: "GA4 active users (all spots)" },
+      { label: "LP 表示イベント数", value: pv.events, note: "Total LP view events" },
+      { label: "ページ内操作数", value: actions, note: "Button taps (party selection)" },
+      { label: "チャットセッション数", value: chats, note: `Conversations (user questions: ${queries})` },
+    ];
+
+    const el = document.getElementById("kpiCards");
+    el.innerHTML = "";
+    for (const c of cards) {
+      const d = document.createElement("div");
+      d.className = "kpi";
+      d.innerHTML = `<div class="label">${c.label}</div><div class="value">${c.value}</div><div class="note">${c.note}</div>`;
+      el.appendChild(d);
+    }
+
+    document.getElementById("integrationNote").innerHTML =
+      `<b>Integration note:</b> ${DATA.integration.matching_note} ` +
+      `Matched chats this week: <b>${matched}</b> / total chats: <b>${chats}</b>.`;
+  }
+
+  // --- Tables ---
+  function fillTables() {
+    // PV table
+    const pvRows = DATA.pv.bySpotLang;
+    let html = "<tr><th>spot_id</th><th>lang</th><th>events</th><th>users</th></tr>";
+    for (const r of pvRows) {
+      html += `<tr><td>${r.spot}</td><td>${r.lang}</td><td>${r.events}</td><td>${r.users}</td></tr>`;
+    }
+    document.getElementById("pvTable").innerHTML = html;
+
+    // Actions table
+    const aRows = DATA.actions.bySpotParty;
+    let html2 = "<tr><th>spot_id</th><th>party</th><th>actions</th></tr>";
+    for (const r of aRows) {
+      html2 += `<tr><td>${r.spot_id}</td><td>${r.party_mapped}</td><td>${r.actions}</td></tr>`;
+    }
+    document.getElementById("actionsTable").innerHTML = html2;
+  }
+
+  // --- Charts (Chart.js) ---
+  let pvChart, actionsChart, partyChart, catChart;
+
+  function renderPVChart() {
+    const rows = DATA.pv.bySpotLang;
+    const spots = Array.from(new Set(rows.map(r => r.spot)));
+    const langs = Array.from(new Set(rows.map(r => r.lang)));
+
+    const filteredRows = (spotFilter==="all") ? rows : rows.filter(r => r.spot === spotFilter);
+    const spots2 = (spotFilter==="all") ? spots : [spotFilter];
+
+    const datasets = langs.map(lang => {
+      const data = spots2.map(s => {
+        const m = filteredRows.find(r => r.spot===s && r.lang===lang);
+        return m ? m.events : 0;
+      });
+      return { label: lang, data, borderWidth: 1 };
+    });
+
+    const cfg = {
+      type: 'bar',
+      data: { labels: spots2, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+      }
+    };
+
+    if (pvChart) pvChart.destroy();
+    pvChart = new Chart(document.getElementById("pvChart"), cfg);
+  }
+
+  function renderActionsChart() {
+    const rows = DATA.actions.bySpotParty;
+    const spots = Array.from(new Set(rows.map(r => r.spot_id)));
+    const parties = Array.from(new Set(rows.map(r => r.party_mapped)));
+
+    const filtered = rows.filter(r =>
+      (spotFilter==="all" || r.spot_id===spotFilter) &&
+      (partyFilter==="all" || r.party_mapped===partyFilter)
+    );
+
+    const spots2 = (spotFilter==="all") ? spots : [spotFilter];
+    const parties2 = (partyFilter==="all") ? parties : [partyFilter];
+
+    const datasets = parties2.map(p => {
+      const data = spots2.map(s => {
+        const m = filtered.find(r => r.spot_id===s && r.party_mapped===p);
+        return m ? m.actions : 0;
+      });
+      return { label: p, data, borderWidth: 1 };
+    });
+
+    const cfg = {
+      type: 'bar',
+      data: { labels: spots2, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+      }
+    };
+
+    if (actionsChart) actionsChart.destroy();
+    actionsChart = new Chart(document.getElementById("actionsChart"), cfg);
+  }
+
+  function renderPartyChart() {
+    const rows = DATA.chat.party_distribution;
+    const filtered = (partyFilter==="all") ? rows : rows.filter(r => r.party===partyFilter);
+    const labels = filtered.map(r => r.party);
+    const data = filtered.map(r => r.conversations);
+
+    const cfg = {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, borderWidth: 1 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    };
+
+    if (partyChart) partyChart.destroy();
+    partyChart = new Chart(document.getElementById("partyChart"), cfg);
+  }
+
+  function renderCatChart() {
+    const rows = DATA.chat.query_category_counts;
+    const labels = rows.map(r => r.category);
+    const data = rows.map(r => r.count);
+
+    const cfg = {
+      type: 'bar',
+      data: { labels, datasets: [{ label: "user questions", data, borderWidth: 1 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    };
+
+    if (catChart) catChart.destroy();
+    catChart = new Chart(document.getElementById("catChart"), cfg);
+  }
+
+  // --- Sankey (D3) ---
+  function renderSankey() {
+    const container = document.getElementById("sankey");
+    container.innerHTML = "";
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    const svg = d3.select(container).append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    const flow = DATA.integration.flow_by_spot;
+
+    const nodes = [];
+    const links = [];
+
+    function nodeId(name) {
+      let idx = nodes.findIndex(n => n.name === name);
+      if (idx === -1) { nodes.push({ name }); idx = nodes.length - 1; }
+      return idx;
+    }
+
+    for (const r of flow) {
+      if (spotFilter!=="all" && r.spot!==spotFilter) continue;
+
+      const v = nodeId(`${r.spot} · LP View`);
+      const a = nodeId(`${r.spot} · Page Action`);
+      const c = nodeId(`${r.spot} · Matched Chat`);
+
+      links.push({ source: v, target: a, value: Math.max(0, r.page_actions) });
+      links.push({ source: a, target: c, value: Math.max(0, r.matched_chats) });
+    }
+
+    const sankey = d3.sankey()
+      .nodeWidth(16)
+      .nodePadding(14)
+      .extent([[12, 10], [width - 12, height - 10]]);
+
+    const graph = sankey({
+      nodes: nodes.map(d => Object.assign({}, d)),
+      links: links.map(d => Object.assign({}, d))
+    });
+
+    svg.append("g")
+      .selectAll("path")
+      .data(graph.links)
+      .join("path")
+      .attr("d", d3.sankeyLinkHorizontal())
+      .attr("fill", "none")
+      .attr("stroke", "rgba(37,99,235,0.45)")
+      .attr("stroke-width", d => Math.max(1, d.width))
+      .append("title")
+      .text(d => `${graph.nodes[d.source.index].name} → ${graph.nodes[d.target.index].name} : ${d.value}`);
+
+    const node = svg.append("g")
+      .selectAll("g")
+      .data(graph.nodes)
+      .join("g");
+
+    node.append("rect")
+      .attr("x", d => d.x0)
+      .attr("y", d => d.y0)
+      .attr("height", d => d.y1 - d.y0)
+      .attr("width", d => d.x1 - d.x0)
+      .attr("rx", 6)
+      .attr("fill", "rgba(22,163,74,0.22)")
+      .attr("stroke", "rgba(17,24,39,0.18)");
+
+    node.append("text")
+      .attr("x", d => d.x0 < width / 2 ? d.x1 + 8 : d.x0 - 8)
+      .attr("y", d => (d.y0 + d.y1) / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", d => d.x0 < width / 2 ? "start" : "end")
+      .attr("fill", "rgba(17,24,39,0.88)")
+      .style("font-size", "12px")
+      .text(d => d.name);
+  }
+
+  // --- Word Cloud ---
+  function renderWordCloud() {
+    const el = document.getElementById("wordcloud");
+    const list = DATA.chat.wordcloud;
+
+    WordCloud(el, {
+      list,
+      gridSize: 8,
+      weightFactor: function (size) { return 10 + size * 6; },
+      rotateRatio: 0.15,
+      minRotation: 0,
+      maxRotation: Math.PI / 2,
+      backgroundColor: "rgba(0,0,0,0)",
+      color: function() {
+        const colors = ["#111827","#2563eb","#16a34a","#7c3aed","#dc2626"]; return colors[Math.floor(Math.random()*colors.length)];
+      },
+      drawOutOfBound: false,
+      shrinkToFit: true
+    });
+  }
+
+  
+  // --- Spot 3-metric bars (most glanceable) ---
+  function renderSpotBars() {
+    const wrap = document.getElementById("spotBars");
+    const flow = DATA.integration.flow_by_spot
+      .filter(r => (spotFilter==="all" || r.spot===spotFilter));
+
+    // Max for scaling (per metric)
+    const maxViews = Math.max(1, ...flow.map(r => r.lp_views));
+    const maxActions = Math.max(1, ...flow.map(r => r.page_actions));
+    const maxChats = Math.max(1, ...flow.map(r => r.matched_chats));
+
+    const colors = {
+      views: "#2563eb",
+      actions: "#16a34a",
+      chats: "#7c3aed"
+    };
+
+    const makeCell = (label, value, max, color) => {
+      const pct = Math.round((value / max) * 100);
+      return `
+        <div class="barcell" title="${label}: ${value}">
+          <div class="barfill" style="width:${pct}%; background:${color}; opacity:0.85;"></div>
+          <small>${label}</small>
+          <div class="barlabel">${value}</div>
+        </div>
+      `;
+    };
+
+    const rows = flow.map(r => `
+      <div class="spotrow">
+        <div class="spotname">${r.spot}</div>
+        <div class="barcols">
+          ${makeCell("LP表示", r.lp_views, maxViews, colors.views)}
+          ${makeCell("ページ内操作", r.page_actions, maxActions, colors.actions)}
+          ${makeCell("チャット", r.matched_chats, maxChats, colors.chats)}
+        </div>
+      </div>
+    `).join("");
+
+    wrap.innerHTML = `<div class="spotbars">${rows}</div>`;
+  }
+
+  function renderAll() {
+    buildKPIs();
+    fillTables();
+    renderPVChart();
+    renderSpotBars();
+    renderActionsChart();
+    renderPartyChart();
+    renderCatChart();
+    renderSankey();
+    renderWordCloud();
+  }
+
+  function addQuickFilters() {
+    const hdr = document.querySelector(".subtitle");
+    const spots = ["all", ...Array.from(new Set(DATA.pv.bySpotLang.map(r => r.spot)))];
+    const parties = ["all", ...Array.from(new Set(DATA.actions.bySpotParty.map(r => r.party_mapped)))];
+
+    const wrap = document.createElement("div");
+    wrap.style.marginTop = "8px";
+    wrap.className = "row";
+    wrap.style.color = "var(--text)";
+    wrap.style.gap = "8px";
+    wrap.style.flexWrap = "wrap";
+
+    const mkBtn = (label, onClick) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.style.cursor = "pointer";
+      b.style.border = "1px solid var(--border)";
+      b.style.background = "#ffffff";
+      b.style.color = "var(--text)";
+      b.style.borderRadius = "999px";
+      b.style.padding = "7px 12px";
+      b.style.fontSize = "12px";
+      b.style.fontWeight = "800";
+      b.style.boxShadow = "0 1px 0 rgba(17,17,17,0.04)";
+      b.onmouseenter = () => { b.style.background = "var(--card2)"; };
+      b.onmouseleave = () => { b.style.background = "#ffffff"; };
+      b.onclick = onClick;
+      return b;
+    };
+
+    wrap.appendChild(Object.assign(document.createElement("span"), {textContent:"Spot:", style:"font-weight:900; color: var(--text);"}));
+    wrap.appendChild(document.createTextNode(" "));
+    for (const s of spots) wrap.appendChild(mkBtn(s, () => setFilter("spot", s)));
+
+    const spacer = document.createElement("span");
+    spacer.style.width = "10px";
+    wrap.appendChild(spacer);
+
+    wrap.appendChild(Object.assign(document.createElement("span"), {textContent:"Party:", style:"font-weight:900; color: var(--text);"}));
+    wrap.appendChild(document.createTextNode(" "));
+    for (const p of parties) wrap.appendChild(mkBtn(p, () => setFilter("party", p)));
+
+    hdr.parentElement.appendChild(wrap);
+  }
+
+  window.addEventListener("load", () => {
+    addQuickFilters();
+    renderAll();
+  });
+
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderSankey();
+      renderWordCloud();
+    }, 250);
+  });
+</script>
+</body>
+</html>
