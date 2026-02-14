@@ -1,0 +1,1463 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>焼津市 観光DXダッシュボード（latest / 自動読込）</title>
+
+  <!-- External libs (CDN). If you need fully offline, tell me and I’ll inline/minify later. -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#ffffff; --fg:#111111; --muted:#6b7280; --card:#ffffff; --border:#e5e7eb;
+      --blue:#2563eb; --red:#dc2626; --yellow:#f59e0b; --green:#16a34a;
+      --shadow: 0 8px 24px rgba(0,0,0,.08);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+    header{position:sticky;top:0;background:rgba(255,255,255,.9);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border);z-index:10}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    h1{margin:0;font-size:18px}
+    .sub{margin-top:4px;color:var(--muted);font-size:12px;line-height:1.4}
+    .grid{display:grid;gap:12px}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media (max-width: 900px){ .grid.cols-2,.grid.cols-3{grid-template-columns:1fr} }
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px}
+    .card h2{margin:0 0 8px 0;font-size:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    label{font-size:12px;color:var(--muted)}
+    input[type="file"]{font-size:12px}
+    select,input[type="date"],input[type="text"]{border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-size:13px}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:12px;padding:9px 12px;font-size:13px;cursor:pointer}
+    .btn:hover{border-color:#cbd5e1}
+    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--muted)}
+    .kpi{display:flex;flex-direction:column;gap:4px}
+    .kpi .v{font-size:22px;font-weight:700;line-height:1}
+    .kpi .l{font-size:12px;color:var(--muted)}
+    .muted{color:var(--muted)}
+    .note{font-size:12px;color:var(--muted);line-height:1.5}
+    canvas{max-height:320px}
+    .two{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+    @media (max-width: 900px){ .two{grid-template-columns:1fr} }
+    .divider{height:1px;background:var(--border);margin:10px 0}
+    .small{font-size:12px}
+    .warn{color:#b45309}
+    .ok{color:#15803d}
+    .mapWrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    iframe{border:0;width:100%}
+    .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff}
+    .dot{width:10px;height:10px;border-radius:999px;background:#ddd}
+    .dot.ok{background:#22c55e}
+    .dot.ng{background:#ef4444}
+    .dot.wait{background:#f59e0b}
+  </style>
+</head>
+
+<body>
+<div id="boot-banner" style="position:sticky;top:0;z-index:9999;background:#fff3cd;color:#111;padding:10px 14px;border-bottom:1px solid #e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  ✅ dashboard_latest.html 読み込み完了 /
+  <span id="boot-status">データ自動読み込み中...</span>
+  <span class="badge" style="margin-left:10px">
+    <span class="dot wait" id="dotAuto"></span>
+    <span>Auto: <b id="autoLabel">loading</b></span>
+  </span>
+</div>
+
+<script>
+(function(){
+  const el = document.getElementById('boot-status');
+  window.addEventListener('error', function(e){
+    el.textContent = '❌ JavaScript エラー: ' + (e && e.message ? e.message : 'unknown');
+    const pre = document.createElement('pre');
+    pre.style.whiteSpace='pre-wrap';
+    pre.style.margin='8px 0 0';
+    pre.textContent = (e && e.error && e.error.stack) ? e.error.stack : '';
+    document.getElementById('boot-banner').appendChild(pre);
+    document.getElementById('dotAuto')?.classList?.remove('wait');
+    document.getElementById('dotAuto')?.classList?.add('ng');
+    document.getElementById('autoLabel').textContent = 'error';
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    el.textContent = '❌ Promise エラー: ' + (e && e.reason ? (e.reason.message||String(e.reason)) : 'unknown');
+    document.getElementById('dotAuto')?.classList?.remove('wait');
+    document.getElementById('dotAuto')?.classList?.add('ng');
+    document.getElementById('autoLabel').textContent = 'error';
+  });
+  document.addEventListener('DOMContentLoaded', function(){
+    el.textContent = '✅ JS起動OK（データ自動読み込みを開始）';
+  });
+})();
+</script>
+
+<header>
+  <div class="wrap">
+    <h1>焼津市 観光DXダッシュボード（latest / 自動読込）</h1>
+    <div class="sub">
+      既定で <b>./data/ga.csv</b> / <b>./data/party.csv</b> / <b>./data/chat.json</b> を自動で読み込みます。<br/>
+      読み込みに失敗した場合は、下の「手動アップロード（保険）」から復旧できます。
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 手動アップロード（保険） -->
+  <details class="card" style="margin-top:12px" open>
+    <summary style="cursor:pointer; font-weight:700">手動アップロード（保険）</summary>
+    <div class="note" style="margin-top:8px">
+      <span class="warn">※通常は不要</span>：Auto読込が失敗したときだけ使ってください。
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div class="row">
+        <div style="min-width:280px">
+          <label>ページ表示（GA4エクスポート .xlsx / .csv）</label><br/>
+          <input id="fileGa" type="file" accept=".xlsx,.xls,.csv"/>
+        </div>
+        <span id="gaStatus" class="pill">未読み込み</span>
+      </div>
+
+      <div class="row">
+        <div style="min-width:280px">
+          <label>人数ボタンログ（.xlsx / .csv）</label><br/>
+          <input id="fileParty" type="file" accept=".xlsx,.xls,.csv"/>
+        </div>
+        <span id="partyStatus" class="pill">未読み込み</span>
+      </div>
+
+      <div class="row">
+        <div style="min-width:280px">
+          <label>チャットログ（.xlsx / .csv）</label><br/>
+          <input id="fileChat" type="file" accept=".xlsx,.xls,.csv"/>
+        </div>
+        <span id="chatStatus" class="pill">未読み込み</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <div>
+          <label>期間フィルタ（人数ボタン / チャットに適用）</label><br/>
+          <input id="dateFrom" type="date"/>
+          <span class="muted small">〜</span>
+          <input id="dateTo" type="date"/>
+          <button class="btn" id="btnApply">適用</button>
+        </div>
+        <div style="flex:1"></div>
+        <div>
+          <label>施設フィルタ（人数ボタン / GAに適用）</label><br/>
+          <select id="spotSelect" multiple size="3" style="min-width:260px"></select>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="warn">注意：</span>ページ表示（GA4）はエクスポートされた期間の集計値です。日付フィルタで「後から再集計」はできません（必要なら別期間でGA出力→再アップロードしてください）。
+      </div>
+    </div>
+  </details>
+
+  <section class="grid cols-2" style="margin-top:12px">
+    <div class="card">
+      <h2>Google My Maps（緯度経度マップ）</h2>
+      <div class="note">
+        My Maps は「地図を一般公開」している必要があります（公開されていないと埋め込みが表示されません）。  
+        埋め込みは iframe で行います。My Maps の共有URL（mid=...）を貼るだけでOKです。
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input id="mymapsUrl" type="text" style="flex:1" placeholder="https://www.google.com/maps/d/u/0/edit?mid=... を貼り付け"/>
+        <button class="btn" id="btnSetMap">反映</button>
+      </div>
+      <div class="mapWrap" style="margin-top:10px">
+        <iframe id="mapFrame" height="360" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                src="about:blank" title="Yaizu My Maps"></iframe>
+      </div>
+      <div class="note small" style="margin-top:8px">
+        表示されない場合：① My Maps を「公開（Public on the web）」にする ② 会社ネットワークの制限/拡張機能を確認 ③ 別ブラウザで試す
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Autoデータ読み込み状況</h2>
+      <div class="note" style="margin-bottom:10px">
+        <b>./data/</b> のファイルを fetch で読み込みます（GitHub Pages対応）。
+      </div>
+      <div class="row">
+        <span class="pill" id="autoGa">ga.csv: -</span>
+        <span class="pill" id="autoParty">party.csv: -</span>
+        <span class="pill" id="autoChat">chat.json: -</span>
+      </div>
+      <div class="divider"></div>
+      <div class="row">
+        <button class="btn" id="btnReloadAuto">Autoデータを再読み込み</button>
+        <span class="note small muted">※ data を差し替えた直後などに使用</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid cols-3" style="margin-top:12px">
+    <div class="card kpi">
+      <div class="v" id="kpiViews">—</div>
+      <div class="l">ページ表示回数（GA）</div>
+      <div class="small muted" id="kpiViewsSub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="v" id="kpiParty">—</div>
+      <div class="l">人数ボタン押下回数</div>
+      <div class="small muted" id="kpiPartySub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="v" id="kpiChat">—</div>
+      <div class="l">チャット会話数（conversation_id）</div>
+      <div class="small muted" id="kpiChatSub">—</div>
+    </div>
+  </section>
+
+  <section class="grid cols-2" style="margin-top:12px">
+    <div class="card">
+      <h2>施設別：ページ表示回数（GA）</h2>
+      <canvas id="chartViews"></canvas>
+    </div>
+    <div class="card">
+      <h2>施設別：人数構成（ボタン押下）</h2>
+      <canvas id="chartPartyBySpot"></canvas>
+    </div>
+  </section>
+
+  <section class="grid cols-2" style="margin-top:12px">
+    <div class="card">
+      <h2>時系列：人数ボタン押下（合計）</h2>
+      <canvas id="chartPartyTime"></canvas>
+    </div>
+    <div class="card">
+      <h2>チャット：日別メッセージ数（user / assistant）</h2>
+      <canvas id="chartChatTime"></canvas>
+    </div>
+  </section>
+
+  <!-- ✅ 位置調整：言語割合（円グラフ）をワードクラウド直上へ -->
+  <section class="grid cols-2" style="margin-top:12px">
+    <div class="card">
+      <h2>チャット利用者：使用言語の割合（user発話）</h2>
+      <canvas id="chartLangShare"></canvas>
+      <div class="note small" id="langShareNote" style="margin-top:8px">—</div>
+    </div>
+    <div class="card">
+      <h2>補足</h2>
+      <div class="note">
+        言語判定は簡易ヒューリスティックです（日本語/韓国語/中国語/英語/インドネシア語/Other）。<br/>
+        厳密判定が必要なら、後でルール追加・辞書強化できます。
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:12px">
+    <h2>ワードクラウド（ユーザー発話・言語別）</h2>
+    <div class="row">
+      <label>言語</label>
+      <select id="langSelect">
+        <option value="all">All</option>
+        <option value="ja">日本語</option>
+        <option value="en">English</option>
+        <option value="zh">Chinese</option>
+        <option value="ko">Korean</option>
+        <option value="id">Indonesian</option>
+        <option value="other">Other</option>
+      </select>
+
+      <label style="margin-left:8px">上位</label>
+      <select id="topN">
+        <option>80</option>
+        <option selected>120</option>
+        <option>200</option>
+      </select>
+
+      <button class="btn" id="btnWordcloud">再生成</button>
+      <span class="pill" id="wcStatus">未生成</span>
+    </div>
+
+    <div class="two" style="margin-top:10px">
+      <div class="mapWrap" style="height:360px;display:flex;align-items:stretch">
+        <canvas id="wcCanvas" width="900" height="520" style="width:100%;height:100%"></canvas>
+      </div>
+      <div>
+        <div class="note">
+          仕様：チャットログの <b>role=user</b> の content から語を抽出します。<br/>
+          日本語はブラウザの分かち書き（Intl.Segmenter）を優先、未対応環境では簡易分割。英語等は単語分割＋簡易ストップワード除外。
+        </div>
+        <div class="divider"></div>
+        <div class="small">
+          <b>上位ワード（プレビュー）</b>
+          <ol id="topWords" class="small"></ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <details class="card" style="margin-top:12px">
+    <summary style="cursor:pointer; font-weight:700">詳細（開発者向け）</summary>
+    <div class="note" id="debug">未読み込み</div>
+  </details>
+
+</main>
+
+<script>
+/** -----------------------------
+ *  State
+ * ----------------------------- */
+const state = {
+  ga: null,         // [{path, views, ...}]
+  gaRange: null,    // {start,end}
+  party: null,      // [{ts_iso, timestamp_ms, spot_id, ...}]
+  chat: null,       // [{conversation_id, created_at, role, content, detectedLang}]
+  filters: {
+    from: null,
+    to: null,
+    spots: new Set(),
+    lang: 'all'
+  }
+};
+
+const $ = (id)=>document.getElementById(id);
+
+/** -----------------------------
+ *  CSV helpers (fetch用)
+ *  - quoted comma 対応の簡易パーサ（GitHub Pages で十分）
+ * ----------------------------- */
+function parseCSV(text){
+  const rows = [];
+  let row = [];
+  let cur = '';
+  let inQuotes = false;
+
+  for(let i=0;i<text.length;i++){
+    const ch = text[i];
+    const next = text[i+1];
+
+    if(inQuotes){
+      if(ch === '"' && next === '"'){
+        cur += '"'; i++;
+      }else if(ch === '"'){
+        inQuotes = false;
+      }else{
+        cur += ch;
+      }
+      continue;
+    }
+
+    if(ch === '"'){
+      inQuotes = true;
+      continue;
+    }
+
+    if(ch === ','){
+      row.push(cur); cur='';
+      continue;
+    }
+
+    if(ch === '\r'){
+      continue;
+    }
+
+    if(ch === '\n'){
+      row.push(cur); cur='';
+      // 空行はスキップ
+      if(row.some(c => String(c).trim() !== '')) rows.push(row);
+      row = [];
+      continue;
+    }
+
+    cur += ch;
+  }
+
+  // last
+  row.push(cur);
+  if(row.some(c => String(c).trim() !== '')) rows.push(row);
+
+  return rows;
+}
+
+function csvRowsToObjects(rows){
+  if(!rows || !rows.length) return [];
+  const header = rows[0].map(x=>String(x||'').trim());
+  const out = [];
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || !r.length) continue;
+    const obj = {};
+    for(let c=0;c<header.length;c++){
+      const key = header[c] || `col${c}`;
+      obj[key] = r[c];
+    }
+    obj.__row = r;
+    obj.__header = header;
+    const hasAny = Object.values(obj).some(v=>v!==undefined && v!==null && String(v).trim()!=='');
+    if(hasAny) out.push(obj);
+  }
+  return out;
+}
+
+/** -----------------------------
+ *  Utilities
+ * ----------------------------- */
+function setPill(el, text){ el.textContent = text; }
+function toDateOnlyISO(d){
+  const z = new Date(d);
+  const yyyy = z.getFullYear();
+  const mm = String(z.getMonth()+1).padStart(2,'0');
+  const dd = String(z.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function safeNum(x, fallback=0){
+  const n = Number(x);
+  return Number.isFinite(n) ? n : fallback;
+}
+function normalizeKeyName(k){
+  return String(k||'').trim().toLowerCase().replace(/\s+/g,'');
+}
+function getField(o, names){
+  const map = {};
+  for(const k of Object.keys(o||{})){
+    map[normalizeKeyName(k)] = k;
+  }
+  for(const n of names){
+    const nk = normalizeKeyName(n);
+    if(map[nk]!==undefined) return o[map[nk]];
+  }
+  const keys = Object.keys(o||{});
+  for(const n of names){
+    const nk = normalizeKeyName(n);
+    const hit = keys.find(k=>normalizeKeyName(k).includes(nk));
+    if(hit) return o[hit];
+  }
+  return undefined;
+}
+
+function parseMidFromUrl(url){
+  try{
+    const u = new URL(url);
+    const mid = u.searchParams.get('mid');
+    if(mid) return mid;
+    if(u.pathname.includes('/d/embed') || u.pathname.includes('/d/u/0/embed')){
+      return u.searchParams.get('mid');
+    }
+    return null;
+  }catch(e){ return null; }
+}
+function groupBy(arr, keyFn){
+  const m = new Map();
+  for(const x of arr){
+    const k = keyFn(x);
+    if(!m.has(k)) m.set(k, []);
+    m.get(k).push(x);
+  }
+  return m;
+}
+
+/** -----------------------------
+ *  XLSX/CSV Reader（手動アップロード用）
+ * ----------------------------- */
+async function readAnyTable(file){
+  const name = file.name.toLowerCase();
+  const buf = await file.arrayBuffer();
+  if(name.endsWith('.csv')){
+    const text = new TextDecoder('utf-8').decode(buf);
+    return parseCSV(text);
+  }
+  const wb = XLSX.read(buf, {type:'array'});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
+  return rows;
+}
+async function readAnyObjects(file){
+  const rows = await readAnyTable(file);
+  return csvRowsToObjects(rows);
+}
+
+/** -----------------------------
+ *  Parsers（あなたの最新版ロジックを踏襲）
+ * ----------------------------- */
+function normalizeSpotId(x){
+  return String(x||'').trim().replace(/^\//,'').toLowerCase();
+}
+const SPOT_LABELS = {
+  "sakana-center": "焼津さかなセンター",
+  "tourist-information-center": "焼津市観光協会",
+  "migiwaya": "汀家"
+};
+function spotLabel(spotId){
+  const key = normalizeSpotId(spotId);
+  return SPOT_LABELS[key] || spotId;
+}
+
+// GA
+function parseGA(rows){
+  const toNum = (v)=>{
+    if(v===undefined || v===null) return NaN;
+    const s = String(v).replace(/,/g,'').trim();
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const isBlankRow = (r)=> !r || r.length===0 || r.every(x=> String(x??'').trim()==='');
+
+  let start=null,end=null;
+  for(const r of rows){
+    if(!r || r.length<1) continue;
+    const a = String(r[0]??'');
+    const m1 = a.match(/開始日:\s*(\d{8})/);
+    const m2 = a.match(/終了日:\s*(\d{8})/);
+    const m3 = a.match(/(\d{8})\s*-\s*(\d{8})/);
+    if(m1) start = `${m1[1].slice(0,4)}-${m1[1].slice(4,6)}-${m1[1].slice(6,8)}`;
+    if(m2) end   = `${m2[1].slice(0,4)}-${m2[1].slice(4,6)}-${m2[1].slice(6,8)}`;
+    if(m3){
+      start = `${m3[1].slice(0,4)}-${m3[1].slice(4,6)}-${m3[1].slice(6,8)}`;
+      end   = `${m3[2].slice(0,4)}-${m3[2].slice(4,6)}-${m3[2].slice(6,8)}`;
+    }
+  }
+
+  // Pivot-style
+  let headerIdx = -1;
+  let header = null;
+  for(let i=0;i<rows.length;i++){
+    const r = rows[i];
+    if(isBlankRow(r)) continue;
+    const first = String(r[0]??'').trim();
+    if(first === 'spot_id' && r.some(x=>String(x??'').trim()==='イベント数')){
+      headerIdx = i;
+      header = r.map(x=>String(x??'').trim());
+      break;
+    }
+  }
+  if(headerIdx >= 0){
+    const eventIdxs = [];
+    const auIdxs = [];
+    header.forEach((h, idx)=>{
+      if(h === 'イベント数') eventIdxs.push(idx);
+      if(h === 'アクティブ ユーザー') auIdxs.push(idx);
+    });
+    const totalEventIdx = eventIdxs.length ? eventIdxs[eventIdxs.length-1] : -1;
+    const totalAuIdx = auIdxs.length ? auIdxs[auIdxs.length-1] : -1;
+
+    const data = [];
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r = rows[i];
+      if(isBlankRow(r)) continue;
+      const rawSpot = String(r[0]??'').trim();
+      if(!rawSpot || rawSpot === '総計') continue;
+      const spot_id = normalizeSpotId(rawSpot);
+      if(!spot_id) continue;
+
+      const pv = totalEventIdx>=0 ? toNum(r[totalEventIdx]) : NaN;
+      const au = totalAuIdx>=0 ? toNum(r[totalAuIdx]) : NaN;
+
+      data.push({
+        spot_id,
+        path: spot_id,
+        views: Number.isFinite(pv) ? pv : 0,
+        active_users: Number.isFinite(au) ? au : undefined
+      });
+    }
+    return { data, range: (start&&end)?{start,end}:null };
+  }
+
+  // Standard table
+  let hRow = null, hIdx = -1;
+  for(let i=0;i<rows.length;i++){
+    const r = rows[i];
+    if(isBlankRow(r)) continue;
+    const joined = r.map(x=>String(x??'').trim()).join('|');
+    if(joined.includes('ページパス') || joined.includes('ページパスとスクリーン') || joined.includes('Page path')){
+      hRow = r.map(x=>String(x??'').trim());
+      hIdx = i;
+      break;
+    }
+  }
+  if(hIdx < 0){
+    for(let i=0;i<rows.length;i++){
+      if(!isBlankRow(rows[i])){
+        hRow = rows[i].map(x=>String(x??'').trim());
+        hIdx = i;
+        break;
+      }
+    }
+  }
+  const colIndex = (names)=>{
+    if(!hRow) return -1;
+    for(const n of names){
+      const idx = hRow.findIndex(h=>h===n);
+      if(idx>=0) return idx;
+    }
+    return -1;
+  };
+
+  const pathIdx = colIndex(['ページパスとスクリーン クラス','ページパス','Page path and screen class','Page path','ページパスとスクリーン クラス ']);
+  const viewIdx = colIndex(['表示回数','Views','表示回数（キーイベント）','キーイベント','Key events']);
+  const auIdx   = colIndex(['アクティブ ユーザー','Active users']);
+
+  const data = [];
+  for(let i=hIdx+1;i<rows.length;i++){
+    const r = rows[i];
+    if(isBlankRow(r)) continue;
+
+    const rawPath = pathIdx>=0 ? String(r[pathIdx]??'').trim() : String(r[0]??'').trim();
+    if(!rawPath || rawPath==='総計') continue;
+
+    const spot_id = normalizeSpotId(rawPath);
+    if(!spot_id) continue;
+
+    let pv = viewIdx>=0 ? toNum(r[viewIdx]) : NaN;
+    if(!Number.isFinite(pv)){
+      const keyIdx = colIndex(['キーイベント','Key events','イベント数']);
+      if(keyIdx>=0) pv = toNum(r[keyIdx]);
+    }
+    if(!Number.isFinite(pv)){
+      let best = NaN;
+      for(const v of r){
+        const n = toNum(v);
+        if(Number.isFinite(n) && (Number.isNaN(best) || n>best)) best = n;
+      }
+      pv = Number.isFinite(best) ? best : 0;
+    }
+
+    const au = auIdx>=0 ? toNum(r[auIdx]) : NaN;
+
+    data.push({
+      spot_id,
+      path: spot_id,
+      views: Number.isFinite(pv)?pv:0,
+      active_users: Number.isFinite(au)?au:undefined
+    });
+  }
+  return { data, range: (start&&end)?{start,end}:null };
+}
+
+// party
+function normalizePartySize(v){
+  if(v===undefined || v===null) return '';
+  if(v instanceof Date){
+    if(v.getMonth()===2 && v.getDate()===5) return '3-5';
+    return v.toISOString().slice(0,10);
+  }
+  let s = String(v).trim();
+  if(!s) return '';
+  s = s.replace(/[０-９]/g, d => String(d.charCodeAt(0) - 0xFF10));
+  s = s.replace(/[–—−]/g,'-');
+  const lower = s.toLowerCase();
+  if(lower === 'group' || s.includes('団体')) return 'group';
+  if(s === '3-5' || s.includes('3〜5') || s.includes('3～5') || s.includes('3人～5人') || s.includes('3~5')) return '3-5';
+  const m = lower.match(/^(\d+(?:\.\d+)?)\s*(?:人)?$/);
+  if(m){
+    const n = Number(m[1]);
+    if(n===1) return '1';
+    if(n===2) return '2';
+  }
+  if(lower === '1') return '1';
+  if(lower === '2') return '2';
+  if(/^\d{4}-03-05/.test(s) || (/03-05/.test(s) && /00:00:00/.test(s))) return '3-5';
+  if(/^\d{4}[\/\-]3[\/\-]5/.test(s)) return '3-5';
+  return s;
+}
+
+function parseParty(objs){
+  const looksLikeUrl = (v)=> typeof v === 'string' && /^https?:\/\//i.test(v.trim());
+  const partyKeyFromAny = (v)=> normalizePartySize(v);
+  const isPartyKey = (k)=> k==='1' || k==='2' || k==='3-5' || k==='group';
+  const pickFirst = (arr, pred)=> { for(const x of arr){ if(pred(x)) return x; } return undefined; };
+
+  const out = (objs||[]).map(o=>{
+    const row = Array.isArray(o.__row) ? o.__row : null;
+
+    let ts_iso = getField(o, ['ts_iso','ts','timestamp','created_at']);
+    let timestamp_ms = getField(o, ['timestamp_ms','timestampms','ms']);
+    let spot_raw = getField(o, ['spot_id','spotid','spot']);
+    let lat = getField(o, ['lat','latitude']);
+    let lon = getField(o, ['lon','lng','longitude']);
+    let accuracy = getField(o, ['accuracy']);
+    let ua = getField(o, ['ua','user_agent','useragent']);
+    let ref = getField(o, ['ref','referer','referrer']);
+    let href = getField(o, ['href','url','page_url','pageurl','page']);
+    let ps   = getField(o, ['party_size','partysize','party','人数','人数構成']);
+
+    if(row){
+      const rowStr = row.map(v=> (v===undefined || v===null) ? '' : String(v));
+      if(!spot_raw || String(spot_raw).trim()===''){
+        const spotCell = pickFirst(rowStr, s=>{
+          const n = normalizeSpotId(s);
+          return !!n;
+        });
+        if(spotCell) spot_raw = spotCell;
+      }
+      if(!href || String(href).trim()===''){
+        const urlCell = pickFirst(rowStr, s=> looksLikeUrl(s.trim()));
+        if(urlCell) href = urlCell;
+      }
+      const psKey = partyKeyFromAny(ps);
+      if(!isPartyKey(psKey)){
+        const partyCell = pickFirst(row, v=>{
+          const k = partyKeyFromAny(v);
+          return isPartyKey(k);
+        });
+        if(partyCell!==undefined) ps = partyCell;
+      }
+      if(!ts_iso || String(ts_iso).trim()==='') ts_iso = row[0];
+      if(!timestamp_ms || String(timestamp_ms).trim()==='') timestamp_ms = row[1];
+      if(lat===undefined || lat===null) lat = row[3];
+      if(lon===undefined || lon===null) lon = row[4];
+      if(accuracy===undefined || accuracy===null) accuracy = row[5];
+      if(!ua || String(ua).trim()==='') ua = row[6];
+      if(!ref || String(ref).trim()==='') ref = row[7];
+    }
+
+    if((ps===undefined || ps===null || String(ps).trim()==='') && typeof href === 'string'){
+      const m = href.match(/[?&](?:party_size|party|size)=([^&#]+)/i);
+      if(m) ps = decodeURIComponent(m[1]);
+    }
+
+    if(looksLikeUrl(String(ps||'')) && !looksLikeUrl(String(href||''))){
+      const tmp = href; href = ps; ps = tmp;
+    }
+
+    const party_size = partyKeyFromAny(ps);
+
+    return {
+      ts_iso: ts_iso,
+      timestamp_ms: safeNum(timestamp_ms),
+      spot_id: normalizeSpotId(spot_raw),
+      lat: safeNum(lat), lon: safeNum(lon),
+      accuracy: safeNum(accuracy),
+      ua: String(ua||''),
+      ref: String(ref||''),
+      href: String(href||''),
+      party_size: party_size
+    };
+  }).filter(x=>x.spot_id);
+
+  return out;
+}
+
+// chat
+function detectLang(text){
+  if(!text) return 'other';
+  const s = String(text);
+  if(/[ぁ-んァ-ン一-龯]/.test(s)) return 'ja';
+  if(/[\uac00-\ud7af]/.test(s)) return 'ko';
+  if(/[\u4e00-\u9fff]/.test(s)) return 'zh';
+  if(/\b(yang|dan|tidak|bisa|saya|kamu|akan|dengan)\b/i.test(s)) return 'id';
+  if(/[a-zA-Z]/.test(s)) return 'en';
+  return 'other';
+}
+
+function parseChat(objs){
+  const out = (objs||[]).map(o=>{
+    const row = Array.isArray(o.__row) ? o.__row : null;
+
+    let conversation_id = getField(o, ['conversation_id','conversationid','cid','会話id']);
+    let created_at = getField(o, ['created_at','createdat','timestamp','ts','日時']);
+    let role = getField(o, ['role','sender','話者']);
+    let content = getField(o, ['content','message','text','本文']);
+
+    if(row){
+      if(!conversation_id || String(conversation_id).trim()==='') conversation_id = row[0];
+      if(!created_at || String(created_at).trim()==='') created_at = row[5] ?? row[0];
+      if(!role || String(role).trim()==='') role = row[6];
+      if(!content || String(content).trim()==='') content = row[8];
+    }
+
+    return {
+      conversation_id: String(conversation_id||'').trim(),
+      created_at: String(created_at||'').trim(),
+      role: String(role||'').trim(),
+      content: String(content||''),
+      detectedLang: detectLang(String(content||''))
+    };
+  }).filter(x=>x.conversation_id);
+
+  return out;
+}
+
+function parseDateAny(x){
+  const d = new Date(x);
+  if(!isNaN(d.getTime())) return d;
+  const n = Number(x);
+  if(Number.isFinite(n) && n>0){
+    const d2 = new Date(n);
+    if(!isNaN(d2.getTime())) return d2;
+  }
+  return null;
+}
+
+/** -----------------------------
+ *  Filters
+ * ----------------------------- */
+function getFilteredParty(){
+  if(!state.party) return [];
+  const from = state.filters.from ? new Date(state.filters.from+'T00:00:00') : null;
+  const to   = state.filters.to   ? new Date(state.filters.to+'T23:59:59') : null;
+  const spots = state.filters.spots;
+  return state.party.filter(r=>{
+    const d = parseDateAny(r.ts_iso) || parseDateAny(r.timestamp_ms);
+    if(!d) return false;
+    if(from && d<from) return false;
+    if(to && d>to) return false;
+    if(spots.size>0 && !spots.has(r.spot_id)) return false;
+    return true;
+  });
+}
+function getFilteredGA(){
+  if(!state.ga) return [];
+  const spots = state.filters.spots;
+  if(spots.size===0) return state.ga;
+  return state.ga.filter(r=>{
+    const key = normalizeSpotId(r.path || r.spot_id || '');
+    return spots.has(key);
+  });
+}
+function getFilteredChat(){
+  if(!state.chat) return [];
+  const from = state.filters.from ? new Date(state.filters.from+'T00:00:00') : null;
+  const to   = state.filters.to   ? new Date(state.filters.to+'T23:59:59') : null;
+  const lang = state.filters.lang;
+  return state.chat.filter(r=>{
+    const d = parseDateAny(r.created_at);
+    if(!d) return false;
+    if(from && d<from) return false;
+    if(to && d>to) return false;
+    if(lang && lang!=='all' && r.detectedLang!==lang) return false;
+    return true;
+  });
+}
+
+/** -----------------------------
+ *  Charts
+ * ----------------------------- */
+let chartViews=null, chartPartyBySpot=null, chartPartyTime=null, chartChatTime=null, chartLangShare=null;
+function destroyIf(c){ if(c){ c.destroy(); } return null; }
+
+function renderViews(){
+  const data = getFilteredGA();
+  const labels = data.map(r=>spotLabel(r.path || r.spot_id));
+  const views = data.map(r=>r.views);
+
+  chartViews = destroyIf(chartViews);
+  chartViews = new Chart($('chartViews'), {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'表示回数', data:views, backgroundColor: 'rgba(37,99,235,.75)' }] },
+    options:{
+      responsive:true,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>`表示回数: ${ctx.raw}`}} },
+      scales:{ x:{ticks:{autoSkip:false}}, y:{beginAtZero:true} }
+    }
+  });
+}
+
+function renderPartyBySpot(){
+  const rows = getFilteredParty();
+  const bySpot = groupBy(rows, r=>r.spot_id);
+
+  const spots = Array.from(bySpot.keys()).sort();
+  const cats = ['1','2','3-5','group'];
+  const catLabel = { '1':'1人', '2':'2人', '3-5':'3人～5人', 'group':'団体' };
+  const colors = {
+    '1': 'rgba(37,99,235,.75)',
+    '2': 'rgba(220,38,38,.70)',
+    '3-5': 'rgba(245,158,11,.75)',
+    'group': 'rgba(22,163,74,.75)'
+  };
+
+  const datasets = cats.map(cat=>({
+    label: catLabel[cat] || cat,
+    data: spots.map(s=>{
+      const arr = bySpot.get(s) || [];
+      return arr.filter(r=>String(r.party_size).trim()===cat).length;
+    }),
+    backgroundColor: colors[cat]
+  }));
+
+  chartPartyBySpot = destroyIf(chartPartyBySpot);
+  chartPartyBySpot = new Chart($('chartPartyBySpot'), {
+    type:'bar',
+    data:{ labels: spots.map(spotLabel), datasets },
+    options:{
+      responsive:true,
+      plugins:{ tooltip:{mode:'index', intersect:false} },
+      scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }
+    }
+  });
+}
+
+function renderPartyTime(){
+  const rows = getFilteredParty();
+  const byDay = new Map();
+  for(const r of rows){
+    const d = parseDateAny(r.ts_iso) || parseDateAny(r.timestamp_ms);
+    if(!d) continue;
+    const k = toDateOnlyISO(d);
+    byDay.set(k, (byDay.get(k)||0)+1);
+  }
+  const days = Array.from(byDay.keys()).sort();
+  const vals = days.map(d=>byDay.get(d));
+
+  chartPartyTime = destroyIf(chartPartyTime);
+  chartPartyTime = new Chart($('chartPartyTime'), {
+    type:'line',
+    data:{ labels:days, datasets:[{ label:'押下回数', data:vals, borderWidth:2, tension:.2 }] },
+    options:{
+      responsive:true,
+      plugins:{ legend:{display:false} },
+      scales:{ y:{beginAtZero:true} }
+    }
+  });
+}
+
+function renderChatTime(){
+  const rows = getFilteredChat();
+  const byDayRole = new Map();
+  for(const r of rows){
+    const d = parseDateAny(r.created_at);
+    if(!d) continue;
+    const day = toDateOnlyISO(d);
+    if(!byDayRole.has(day)) byDayRole.set(day, {user:0, assistant:0});
+    const obj = byDayRole.get(day);
+    if(r.role==='user') obj.user++;
+    else if(r.role==='assistant') obj.assistant++;
+  }
+  const days = Array.from(byDayRole.keys()).sort();
+  const u = days.map(d=>byDayRole.get(d).user);
+  const a = days.map(d=>byDayRole.get(d).assistant);
+
+  chartChatTime = destroyIf(chartChatTime);
+  chartChatTime = new Chart($('chartChatTime'), {
+    type:'line',
+    data:{ labels:days, datasets:[
+      { label:'user', data:u, borderWidth:2, tension:.2 },
+      { label:'assistant', data:a, borderWidth:2, tension:.2 }
+    ]},
+    options:{
+      responsive:true,
+      plugins:{ tooltip:{mode:'index', intersect:false} },
+      scales:{ y:{beginAtZero:true} }
+    }
+  });
+}
+
+function renderLangShare(){
+  const rows = getFilteredChat();
+  if(!rows || !rows.length){
+    chartLangShare = destroyIf(chartLangShare);
+    const noteEl = $('langShareNote');
+    if(noteEl) noteEl.textContent = 'チャット未読み込み、またはフィルタ結果が0件です。';
+    return;
+  }
+
+  const userRows = rows.filter(r => r.role === 'user');
+  const total = userRows.length;
+
+  const counts = { ja:0, en:0, ko:0, zh:0, id:0, other:0 };
+  for(const r of userRows){
+    const k = (r.detectedLang && counts[r.detectedLang] !== undefined) ? r.detectedLang : 'other';
+    counts[k]++;
+  }
+
+  const labelsBase = [
+    {key:'ja', label:'日本語'},
+    {key:'en', label:'英語'},
+    {key:'ko', label:'韓国語'},
+    {key:'zh', label:'中国語'},
+    {key:'id', label:'インドネシア語'},
+    {key:'other', label:'Other'}
+  ];
+
+  const items = labelsBase
+    .map(x => ({...x, value: counts[x.key]}))
+    .filter(x => x.value > 0);
+
+  const labels = items.map(x=>{
+    const pct = total ? (x.value / total * 100) : 0;
+    return `${x.label} ${pct.toFixed(1)}%`;
+  });
+  const data = items.map(x=>x.value);
+
+  chartLangShare = destroyIf(chartLangShare);
+  chartLangShare = new Chart($('chartLangShare'), {
+    type: 'pie',
+    data: { labels, datasets: [{ label:'言語', data }] },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const count = Number(ctx.raw || 0);
+              const pct = total ? (count / total * 100) : 0;
+              return ` ${count.toLocaleString()} 件（${pct.toFixed(1)}%）`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const noteEl = $('langShareNote');
+  if(noteEl){
+    noteEl.textContent = `集計対象: role=user のメッセージ ${total.toLocaleString()} 件（期間フィルタ反映）`;
+  }
+}
+
+/** -----------------------------
+ *  Word cloud（最新版を踏襲）
+ * ----------------------------- */
+const WC_EXCLUDE_COMMON = new Set([
+  'solo','single','couple','family','families','group','groups','party','parties',
+  'one','two','three','four','five','1','2','3','4','5','3-5','3～5',
+  'ひとり','一人','一名','単身',
+  'ふたり','二人','二名',
+  'さんにん','三人','3人','4人','5人','3人～5人','3人〜5人','3～5人','3-5人',
+  'カップル','夫婦','家族','ファミリー','グループ','団体','人数','人',
+  'ok','okay','thanks','thank','please','hello','hi','hey','help',
+  'yes','no','sure','good','great','nice',
+]);
+const WC_STOP_EN = new Set([
+  'the','a','an','and','or','to','of','in','on','for','with','is','are','was','were','be','it','this','that',
+  'i','you','we','they','me','my','your','our','at','as','by','from','can','could','would','should',
+  'do','does','did','not','no','yes','please','thanks','there','here','about','what','which','when','where','who','how',
+  'much','many','some','any','more','most','very','also','just','like'
+]);
+const WC_EXCLUDE_EN = new Set([
+  'recommend','recommended','recommendation','best','good','nice',
+  'information','guide','tips','place','places','spot','spots','area','near',
+  'open','opening','hours','time','today','tomorrow','now',
+  'cost','price','fee','free','ticket',
+]);
+const WC_EXCLUDE_JA = new Set([
+  'です','ます','でした','でしたか','ください','お願い','お願いします','ありがとう','ありがとうございます',
+  '教えて','知りたい','知りたく','教えてください','教えて下さい',
+  'どこ','どちら','いつ','なに','何','誰','どう','どうやって','いくら','いくらですか',
+  '行きたい','行きます','行く','行け','行けますか',
+  'あります','ある','ない','できます','できる',
+  'おすすめ','オススメ','人気','有名',
+  '営業時間','時間','定休日','休み','料金','値段','無料',
+  '近く','周辺','場所','アクセス','行き方','地図'
+]);
+
+function tokenize(text, lang){
+  const s = String(text||'').trim();
+  if(!s) return [];
+
+  if(lang === 'ja'){
+    const out = [];
+    if(typeof Intl !== 'undefined' && Intl.Segmenter){
+      const seg = new Intl.Segmenter('ja', { granularity: 'word' });
+      for(const part of seg.segment(s)){
+        const w = (part.segment||'').trim();
+        if(!w) continue;
+        if(/^[\u3040-\u30FF\u4E00-\u9FFF]+$/.test(w)){
+          out.push(w);
+        }
+      }
+      return out;
+    }
+    return s.split(/[\s,.;:!?()\[\]{}"“”'‘’<>/\\|@#$%^&*+=~`]+/).filter(w=>w && w.length>=2);
+  }
+
+  if(lang === 'zh'){
+    const out = [];
+    if(typeof Intl !== 'undefined' && Intl.Segmenter){
+      const seg = new Intl.Segmenter('zh', { granularity: 'word' });
+      for(const part of seg.segment(s)){
+        const w = (part.segment||'').trim();
+        if(!w) continue;
+        if(/[\u4E00-\u9FFF]/.test(w)) out.push(w);
+      }
+      return out;
+    }
+    const m = s.match(/[\u4E00-\u9FFF]{1,}/g);
+    return m ? m : [];
+  }
+
+  if(lang === 'ko'){
+    const out = [];
+    if(typeof Intl !== 'undefined' && Intl.Segmenter){
+      const seg = new Intl.Segmenter('ko', { granularity: 'word' });
+      for(const part of seg.segment(s)){
+        const w = (part.segment||'').trim();
+        if(!w) continue;
+        if(/[\uAC00-\uD7AF]/.test(w)) out.push(w);
+      }
+      return out;
+    }
+    const m = s.match(/[\uAC00-\uD7AF]{1,}/g);
+    return m ? m : [];
+  }
+
+  const words = s
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g,' ')
+    .replace(/[^a-z0-9'\- ]+/g,' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  return words;
+}
+
+function buildWordFreq(rows, langFilter, topN){
+  const freq = new Map();
+  const wantLang = (langFilter && langFilter !== 'all') ? langFilter : null;
+
+  for(const r of (rows||[])){
+    if(r.role !== 'user') continue;
+    if(wantLang && r.detectedLang !== wantLang) continue;
+
+    const langTok = wantLang ? wantLang : (r.detectedLang || 'en');
+    const tokens = tokenize(r.content, langTok);
+
+    for(const t0 of tokens){
+      const t = (langTok === 'en') ? String(t0).toLowerCase() : String(t0);
+      if(!t) continue;
+      if(t.length <= 1) continue;
+      if(langTok === 'en'){
+        if(WC_EXCLUDE_COMMON.has(t)) continue;
+        if(WC_STOP_EN.has(t)) continue;
+        if(WC_EXCLUDE_EN.has(t)) continue;
+      }else if(langTok === 'ja'){
+        if(WC_EXCLUDE_COMMON.has(t.toLowerCase())) continue;
+        if(WC_EXCLUDE_JA.has(t)) continue;
+      }else{
+        if(WC_EXCLUDE_COMMON.has(t.toLowerCase())) continue;
+      }
+      freq.set(t, (freq.get(t)||0)+1);
+    }
+  }
+
+  return Array.from(freq.entries())
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0, topN||120)
+    .map(([text, size])=>[text, size]);
+}
+
+function renderWordcloud(){
+  if(!state.chat){ setPill($('wcStatus'),'チャット未読み込み'); return; }
+  const lang = $('langSelect').value;
+  state.filters.lang = lang; // keep in sync for time chart too
+  const topN = Number($('topN').value) || 120;
+
+  const rows = getFilteredChat();
+  const list = buildWordFreq(rows, lang, topN);
+
+  const ol = $('topWords'); ol.innerHTML='';
+  for(const [w,c] of list.slice(0,20)){
+    const li=document.createElement('li');
+    li.textContent = `${w} (${c})`;
+    ol.appendChild(li);
+  }
+
+  const canvas = $('wcCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  WordCloud(canvas, {
+    list: list.map(([w,c])=>[w,c]),
+    gridSize: 10,
+    weightFactor: (size)=>Math.max(12, Math.log(size+1)*18),
+    rotateRatio: 0.1,
+    rotationSteps: 2,
+    backgroundColor: '#ffffff'
+  });
+
+  setPill($('wcStatus'), `生成: ${list.length}語`);
+}
+
+/** -----------------------------
+ *  KPI + UI wiring
+ * ----------------------------- */
+function updateSpotSelect(){
+  const sel = $('spotSelect');
+  sel.innerHTML = '';
+  const spots = new Set();
+  if(state.party) for(const r of state.party) spots.add(r.spot_id);
+  if(state.ga) for(const r of state.ga) spots.add(normalizeSpotId(r.path));
+  const arr = Array.from(spots).sort();
+  for(const s of arr){
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    sel.appendChild(opt);
+  }
+}
+
+function updateKPIs(){
+  const ga = getFilteredGA();
+  const views = ga.reduce((a,r)=>a+r.views,0);
+  $('kpiViews').textContent = state.ga ? views.toLocaleString() : '—';
+  $('kpiViewsSub').textContent = state.gaRange ? `GA期間: ${state.gaRange.start} 〜 ${state.gaRange.end}` : (state.ga ? 'GA期間:（不明）' : '—');
+
+  const party = getFilteredParty();
+  $('kpiParty').textContent = state.party ? party.length.toLocaleString() : '—';
+  const uniqSpots = new Set(party.map(r=>r.spot_id)).size;
+  $('kpiPartySub').textContent = state.party ? `施設数: ${uniqSpots}` : '—';
+
+  const chat = getFilteredChat();
+  const conv = new Set(chat.map(r=>r.conversation_id)).size;
+  $('kpiChat').textContent = state.chat ? conv.toLocaleString() : '—';
+  const msg = chat.length;
+  $('kpiChatSub').textContent = state.chat ? `メッセージ数: ${msg.toLocaleString()}` : '—';
+}
+
+function renderAll(){
+  updateKPIs();
+  if(state.ga) renderViews();
+  if(state.party){
+    renderPartyBySpot();
+    renderPartyTime();
+  }
+  if(state.chat){
+    renderChatTime();
+    renderLangShare();
+  }
+  $('debug').textContent = JSON.stringify({
+    ga_loaded: !!state.ga, ga_rows: state.ga?.length||0, ga_range: state.gaRange,
+    party_loaded: !!state.party, party_rows: state.party?.length||0,
+    party_counts: state.party ? state.party.reduce((a,r)=>{a[r.party_size||'(blank)']=(a[r.party_size||'(blank)']||0)+1;return a;}, {}) : {},
+    party_missing: state.party ? state.party.filter(r=>!r.party_size).length : 0,
+    party_sample: state.party ? state.party.slice(0,5).map(r=>({spot_id:r.spot_id, href:r.href, party_size:r.party_size})) : [],
+    chat_loaded: !!state.chat, chat_rows: state.chat?.length||0,
+    filters: {
+      from: state.filters.from, to: state.filters.to,
+      spots: Array.from(state.filters.spots),
+      lang: state.filters.lang
+    }
+  }, null, 2);
+}
+
+/** -----------------------------
+ *  Auto loader (latest)
+ * ----------------------------- */
+async function fetchText(path){
+  const res = await fetch(path, {cache:'no-store'});
+  if(!res.ok) throw new Error(`${path} fetch failed: ${res.status}`);
+  return await res.text();
+}
+async function fetchJSON(path){
+  const res = await fetch(path, {cache:'no-store'});
+  if(!res.ok) throw new Error(`${path} fetch failed: ${res.status}`);
+  return await res.json();
+}
+
+async function loadAuto(){
+  const boot = $('boot-status');
+  const dot = $('dotAuto');
+  const label = $('autoLabel');
+
+  dot.classList.remove('ok','ng');
+  dot.classList.add('wait');
+  label.textContent = 'loading';
+  boot.textContent = '📥 Autoデータ読み込み中...';
+
+  let okCount = 0;
+  const setAuto = (id, msg)=>{ const el=$(id); if(el) el.textContent = msg; };
+
+  try{
+    // GA
+    try{
+      const gaText = await fetchText('./data/ga.csv');
+      const gaRows = parseCSV(gaText);
+      const parsed = parseGA(gaRows);
+      state.ga = parsed.data;
+      state.gaRange = parsed.range;
+      setPill($('gaStatus'), `Auto: ga.csv（${state.ga.length}行）`);
+      setAuto('autoGa', `ga.csv: OK（${state.ga.length}行）`);
+      okCount++;
+    }catch(e){
+      console.warn(e);
+      setAuto('autoGa', `ga.csv: NG`);
+    }
+
+    // Party
+    try{
+      const partyText = await fetchText('./data/party.csv');
+      const partyRows = parseCSV(partyText);
+      const partyObjs = csvRowsToObjects(partyRows);
+      state.party = parseParty(partyObjs);
+      setPill($('partyStatus'), `Auto: party.csv（${state.party.length}行）`);
+      setAuto('autoParty', `party.csv: OK（${state.party.length}行）`);
+      okCount++;
+
+      // date defaults from party if present
+      if(state.party.length){
+        const dates = state.party.map(r=>parseDateAny(r.ts_iso)).filter(Boolean).sort((a,b)=>a-b);
+        if(dates.length){
+          $('dateFrom').value = toDateOnlyISO(dates[0]);
+          $('dateTo').value = toDateOnlyISO(dates[dates.length-1]);
+          state.filters.from = $('dateFrom').value;
+          state.filters.to = $('dateTo').value;
+        }
+      }
+    }catch(e){
+      console.warn(e);
+      setAuto('autoParty', `party.csv: NG`);
+    }
+
+    // Chat
+    try{
+      const chatJson = await fetchJSON('./data/chat.json');
+      // chat.json が「そのまま使える形」の場合に対応
+      // 期待：[{conversation_id, created_at, role, content, ...}]
+      if(Array.isArray(chatJson) && chatJson.length && (chatJson[0].conversation_id || chatJson[0].content)){
+        state.chat = chatJson.map(x=>({
+          conversation_id: String(x.conversation_id||'').trim(),
+          created_at: String(x.created_at||x.createdAt||x.ts||'').trim(),
+          role: String(x.role||'').trim(),
+          content: String(x.content||''),
+          detectedLang: x.detectedLang || detectLang(String(x.content||''))
+        })).filter(x=>x.conversation_id);
+      }else{
+        // 予備：objects として parseChat に通す
+        state.chat = parseChat(chatJson);
+      }
+
+      setPill($('chatStatus'), `Auto: chat.json（${state.chat.length}行）`);
+      setAuto('autoChat', `chat.json: OK（${state.chat.length}行）`);
+      okCount++;
+    }catch(e){
+      console.warn(e);
+      setAuto('autoChat', `chat.json: NG`);
+    }
+
+    updateSpotSelect();
+    renderAll();
+    try{ renderWordcloud(); }catch(e){ console.warn(e); }
+
+    if(okCount>=2){
+      dot.classList.remove('wait');
+      dot.classList.add('ok');
+      label.textContent = 'ok';
+      boot.textContent = `✅ Auto読み込み完了（OK: ${okCount}/3）`;
+    }else{
+      dot.classList.remove('wait');
+      dot.classList.add('ng');
+      label.textContent = 'partial';
+      boot.textContent = `⚠️ Auto読み込みが一部失敗（OK: ${okCount}/3）→ 手動アップロードで復旧できます`;
+    }
+  }catch(err){
+    console.error(err);
+    dot.classList.remove('wait');
+    dot.classList.add('ng');
+    label.textContent = 'error';
+    boot.textContent = `❌ Auto読み込みで致命的エラー: ${err.message}`;
+  }
+}
+
+/** -----------------------------
+ *  Event handlers（手動アップロード）
+ * ----------------------------- */
+$('fileGa').addEventListener('change', async (e)=>{
+  const file = e.target.files?.[0];
+  if(!file) return;
+  try{
+    const rows = await readAnyTable(file);
+    const parsed = parseGA(rows);
+    state.ga = parsed.data;
+    state.gaRange = parsed.range;
+    setPill($('gaStatus'), `読み込み: ${state.ga.length}行`);
+    updateSpotSelect();
+    renderAll();
+  }catch(err){
+    console.error(err);
+    setPill($('gaStatus'), '読み込み失敗');
+    alert('GAファイルの読み込みに失敗しました: ' + err.message);
+  }
+});
+
+$('fileParty').addEventListener('change', async (e)=>{
+  const file = e.target.files?.[0];
+  if(!file) return;
+  try{
+    const objs = await readAnyObjects(file);
+    state.party = parseParty(objs);
+    setPill($('partyStatus'), `読み込み: ${state.party.length}行`);
+    if(state.party.length){
+      const dates = state.party.map(r=>parseDateAny(r.ts_iso)).filter(Boolean).sort((a,b)=>a-b);
+      if(dates.length){
+        $('dateFrom').value = toDateOnlyISO(dates[0]);
+        $('dateTo').value = toDateOnlyISO(dates[dates.length-1]);
+        state.filters.from = $('dateFrom').value;
+        state.filters.to = $('dateTo').value;
+      }
+    }
+    updateSpotSelect();
+    renderAll();
+  }catch(err){
+    console.error(err);
+    setPill($('partyStatus'), '読み込み失敗');
+    alert('人数ボタンログの読み込みに失敗しました: ' + err.message);
+  }
+});
+
+$('fileChat').addEventListener('change', async (e)=>{
+  const file = e.target.files?.[0];
+  if(!file) return;
+  try{
+    const objs = await readAnyObjects(file);
+    state.chat = parseChat(objs);
+    setPill($('chatStatus'), `読み込み: ${state.chat.length}行`);
+    renderAll();
+    try{
+      renderWordcloud();
+    }catch(wcErr){
+      console.error('Wordcloud render error:', wcErr);
+      setPill($('chatStatus'), `読み込み: ${state.chat.length}行（ワードクラウド生成失敗）`);
+      alert('ワードクラウドの生成に失敗しました。\n\n原因: ' + (wcErr?.message || wcErr));
+    }
+  }catch(err){
+    console.error(err);
+    setPill($('chatStatus'), '読み込み失敗');
+    alert('チャットログの読み込みに失敗しました: ' + (err?.message || err));
+  }
+});
+
+$('btnApply').addEventListener('click', ()=>{
+  state.filters.from = $('dateFrom').value || null;
+  state.filters.to   = $('dateTo').value || null;
+  const sel = $('spotSelect');
+  const chosen = new Set(Array.from(sel.selectedOptions).map(o=>o.value));
+  state.filters.spots = chosen;
+
+  renderAll();
+  renderWordcloud();
+});
+
+$('btnWordcloud').addEventListener('click', ()=>{ renderWordcloud(); });
+
+$('btnSetMap').addEventListener('click', ()=>{
+  const url = $('mymapsUrl').value.trim();
+  const mid = parseMidFromUrl(url);
+  if(!mid){
+    alert('mid=... がURLから見つかりませんでした。My Maps のURL（mid=を含む）を貼ってください。');
+    return;
+  }
+  const src = `https://www.google.com/maps/d/embed?mid=${encodeURIComponent(mid)}&ehbc=2E312F`;
+  $('mapFrame').src = src;
+});
+
+$('btnReloadAuto').addEventListener('click', ()=>{ loadAuto(); });
+
+/** Init */
+(function init(){
+  // My Maps initial
+  const initial = "https://www.google.com/maps/d/u/0/edit?mid=1xhKidtJIqbUZFMn3DC9ZFpmkdHxb0rI&usp=sharing";
+  $('mymapsUrl').value = initial;
+  const mid = parseMidFromUrl(initial);
+  if(mid){
+    $('mapFrame').src = `https://www.google.com/maps/d/embed?mid=${encodeURIComponent(mid)}&ehbc=2E312F`;
+  }
+
+  // Auto-load on boot
+  loadAuto();
+})();
+</script>
+
+</body>
+</html>
