@@ -99,7 +99,7 @@
   <div class="wrap">
     <h1>焼津市 観光DXダッシュボード（latest / 自動読込）</h1>
     <div class="sub">
-      既定で <b>./data/ga.csv</b> / <b>./data/party.csv</b> / <b>./data/chat.json</b> を自動で読み込みます。<br/>
+      既定で <b>./data/ga.csv</b> / <b>./data/party.csv</b> / <b>./data/chat.csv</b> を自動で読み込みます。<br/>
       読み込みに失敗した場合は、下の「手動アップロード（保険）」から復旧できます。
     </div>
   </div>
@@ -189,7 +189,7 @@
       <div class="row">
         <span class="pill" id="autoGa">ga.csv: -</span>
         <span class="pill" id="autoParty">party.csv: -</span>
-        <span class="pill" id="autoChat">chat.json: -</span>
+        <span class="pill" id="autoChat">chat.csv: -</span>
       </div>
       <div class="divider"></div>
       <div class="row">
@@ -1302,8 +1302,8 @@ async function loadAuto(){
 
     // Chat
     try{
-      const chatJson = await fetchJSON('./data/chat.json');
-      // chat.json が「そのまま使える形」の場合に対応
+      const chatJson = await fetchJSON('./data/chat.csv');
+      // chat.csv が「そのまま使える形」の場合に対応
       // 期待：[{conversation_id, created_at, role, content, ...}]
       if(Array.isArray(chatJson) && chatJson.length && (chatJson[0].conversation_id || chatJson[0].content)){
         state.chat = chatJson.map(x=>({
@@ -1318,12 +1318,12 @@ async function loadAuto(){
         state.chat = parseChat(chatJson);
       }
 
-      setPill($('chatStatus'), `Auto: chat.json（${state.chat.length}行）`);
-      setAuto('autoChat', `chat.json: OK（${state.chat.length}行）`);
+      setPill($('chatStatus'), `Auto: chat.csv（${state.chat.length}行）`);
+      setAuto('autoChat', `chat.csv: OK（${state.chat.length}行）`);
       okCount++;
     }catch(e){
       console.warn(e);
-      setAuto('autoChat', `chat.json: NG`);
+      setAuto('autoChat', `chat.csv: NG`);
     }
 
     updateSpotSelect();
