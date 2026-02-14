@@ -99,7 +99,7 @@
   <div class="wrap">
     <h1>焼津市 観光DXダッシュボード（latest / 自動読込）</h1>
     <div class="sub">
-      既定で <b>./data/ga.csv</b> / <b>./data/party.csv</b> / <b>./data/chat.csv</b> を自動で読み込みます。<br/>
+      既定で <b>Google Drive（Google Sheets）</b> 上の <b>CSV</b> を自動で読み込みます。<br/>
       読み込みに失敗した場合は、下の「手動アップロード（保険）」から復旧できます。
     </div>
   </div>
@@ -165,7 +165,7 @@
     <div class="card">
       <h2>Google My Maps（緯度経度マップ）</h2>
       <div class="note">
-        My Maps は「地図を一般公開」している必要があります（公開されていないと埋め込みが表示されません）。  
+        My Maps は「地図を一般公開」している必要があります（公開されていないと埋め込みが表示されません）。
         埋め込みは iframe で行います。My Maps の共有URL（mid=...）を貼るだけでOKです。
       </div>
       <div class="row" style="margin-top:8px">
@@ -184,7 +184,7 @@
     <div class="card">
       <h2>Autoデータ読み込み状況</h2>
       <div class="note" style="margin-bottom:10px">
-        <b>./data/</b> のファイルを fetch で読み込みます（GitHub Pages対応）。
+        Google Drive（Google Sheets）の <b>export?format=csv</b> を fetch で読み込みます（GitHub Pages対応）。
       </div>
       <div class="row">
         <span class="pill" id="autoGa">ga.csv: -</span>
@@ -194,7 +194,7 @@
       <div class="divider"></div>
       <div class="row">
         <button class="btn" id="btnReloadAuto">Autoデータを再読み込み</button>
-        <span class="note small muted">※ data を差し替えた直後などに使用</span>
+        <span class="note small muted">※ Drive 側を差し替えた直後などに使用</span>
       </div>
     </div>
   </section>
@@ -307,6 +307,20 @@
 
 <script>
 /** -----------------------------
+ *  ✅ Google Sheets CSV URLs（確定版）
+ *  - ① = ga.csv
+ *  - ② = party.csv
+ *  - ③ = chat.csv
+ *  ※ それぞれ「リンクを知っている全員：閲覧者」にしておく必要があります
+ * ----------------------------- */
+const GA_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1F-SV4AhUDjJDe1qLjDAzYURxFClVxkBr94N0Jku1lU4/export?format=csv";
+const PARTY_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1yi4_L4iYmHqYy7OxDsnS6TvitAElVr1p6sQlRZBu48A/export?format=csv";
+const CHAT_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1-E4_cU-fEen7VeIqjIYIGV1Fp4mtjEH34yFZ-32ntSg/export?format=csv";
+
+/** -----------------------------
  *  State
  * ----------------------------- */
 const state = {
@@ -365,7 +379,6 @@ function parseCSV(text){
 
     if(ch === '\n'){
       row.push(cur); cur='';
-      // 空行はスキップ
       if(row.some(c => String(c).trim() !== '')) rows.push(row);
       row = [];
       continue;
@@ -374,7 +387,6 @@ function parseCSV(text){
     cur += ch;
   }
 
-  // last
   row.push(cur);
   if(row.some(c => String(c).trim() !== '')) rows.push(row);
 
@@ -1224,7 +1236,6 @@ function renderAll(){
     party_missing: state.party ? state.party.filter(r=>!r.party_size).length : 0,
     party_sample: state.party ? state.party.slice(0,5).map(r=>({spot_id:r.spot_id, href:r.href, party_size:r.party_size})) : [],
     chat_loaded: !!state.chat, chat_rows: state.chat?.length||0,
-    chat_sample: state.chat ? state.chat.slice(0,3) : [],
     filters: {
       from: state.filters.from, to: state.filters.to,
       spots: Array.from(state.filters.spots),
@@ -1240,6 +1251,11 @@ async function fetchText(path){
   const res = await fetch(path, {cache:'no-store'});
   if(!res.ok) throw new Error(`${path} fetch failed: ${res.status}`);
   return await res.text();
+}
+
+function looksLikeHtml(text){
+  const t = String(text||'').trim().toLowerCase();
+  return t.startsWith('<!doctype html') || t.startsWith('<html') || t.includes('<head') || t.includes('<body');
 }
 
 async function loadAuto(){
@@ -1258,7 +1274,8 @@ async function loadAuto(){
   try{
     // GA
     try{
-      const gaText = await fetchText('./data/ga.csv');
+      const gaText = await fetchText(GA_CSV_URL);
+      if(looksLikeHtml(gaText)) throw new Error('ga: HTMLが返っています（共有設定/権限を確認）');
       const gaRows = parseCSV(gaText);
       const parsed = parseGA(gaRows);
       state.ga = parsed.data;
@@ -1273,7 +1290,8 @@ async function loadAuto(){
 
     // Party
     try{
-      const partyText = await fetchText('./data/party.csv');
+      const partyText = await fetchText(PARTY_CSV_URL);
+      if(looksLikeHtml(partyText)) throw new Error('party: HTMLが返っています（共有設定/権限を確認）');
       const partyRows = parseCSV(partyText);
       const partyObjs = csvRowsToObjects(partyRows);
       state.party = parseParty(partyObjs);
@@ -1296,9 +1314,10 @@ async function loadAuto(){
       setAuto('autoParty', `party.csv: NG`);
     }
 
-    // Chat ✅ CSVとして読む（重要修正）
+    // Chat（✅ CSVとして読む：fetchJSONは使わない）
     try{
-      const chatText = await fetchText('./data/chat.csv');
+      const chatText = await fetchText(CHAT_CSV_URL);
+      if(looksLikeHtml(chatText)) throw new Error('chat: HTMLが返っています（共有設定/権限を確認）');
       const chatRows = parseCSV(chatText);
       const chatObjs = csvRowsToObjects(chatRows);
       state.chat = parseChat(chatObjs);
