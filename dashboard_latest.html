@@ -1224,6 +1224,7 @@ function renderAll(){
     party_missing: state.party ? state.party.filter(r=>!r.party_size).length : 0,
     party_sample: state.party ? state.party.slice(0,5).map(r=>({spot_id:r.spot_id, href:r.href, party_size:r.party_size})) : [],
     chat_loaded: !!state.chat, chat_rows: state.chat?.length||0,
+    chat_sample: state.chat ? state.chat.slice(0,3) : [],
     filters: {
       from: state.filters.from, to: state.filters.to,
       spots: Array.from(state.filters.spots),
@@ -1239,11 +1240,6 @@ async function fetchText(path){
   const res = await fetch(path, {cache:'no-store'});
   if(!res.ok) throw new Error(`${path} fetch failed: ${res.status}`);
   return await res.text();
-}
-async function fetchJSON(path){
-  const res = await fetch(path, {cache:'no-store'});
-  if(!res.ok) throw new Error(`${path} fetch failed: ${res.status}`);
-  return await res.json();
 }
 
 async function loadAuto(){
@@ -1300,23 +1296,12 @@ async function loadAuto(){
       setAuto('autoParty', `party.csv: NG`);
     }
 
-    // Chat
+    // Chat ✅ CSVとして読む（重要修正）
     try{
-      const chatJson = await fetchJSON('./data/chat.csv');
-      // chat.csv が「そのまま使える形」の場合に対応
-      // 期待：[{conversation_id, created_at, role, content, ...}]
-      if(Array.isArray(chatJson) && chatJson.length && (chatJson[0].conversation_id || chatJson[0].content)){
-        state.chat = chatJson.map(x=>({
-          conversation_id: String(x.conversation_id||'').trim(),
-          created_at: String(x.created_at||x.createdAt||x.ts||'').trim(),
-          role: String(x.role||'').trim(),
-          content: String(x.content||''),
-          detectedLang: x.detectedLang || detectLang(String(x.content||''))
-        })).filter(x=>x.conversation_id);
-      }else{
-        // 予備：objects として parseChat に通す
-        state.chat = parseChat(chatJson);
-      }
+      const chatText = await fetchText('./data/chat.csv');
+      const chatRows = parseCSV(chatText);
+      const chatObjs = csvRowsToObjects(chatRows);
+      state.chat = parseChat(chatObjs);
 
       setPill($('chatStatus'), `Auto: chat.csv（${state.chat.length}行）`);
       setAuto('autoChat', `chat.csv: OK（${state.chat.length}行）`);
