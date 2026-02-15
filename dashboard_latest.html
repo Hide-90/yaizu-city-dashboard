@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>焼津市 観光DXダッシュボード（latest / 自動読込）</title>
+  <title>焼津市 観光DXダッシュボード</title>
 
   <!-- External libs (CDN). If you need fully offline, tell me and I’ll inline/minify later. -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
@@ -99,8 +99,8 @@
   <div class="wrap">
     <h1>焼津市 観光DXダッシュボード（latest / 自動読込）</h1>
     <div class="sub">
-      既定で <b>Google Drive（Google Sheets）</b> 上の <b>CSV</b> を自動で読み込みます。<br/>
-      読み込みに失敗した場合は、下の「手動アップロード（保険）」から復旧できます。
+      起動時に <b>Google Drive（Google Sheets）</b> 上の <b>CSV</b> を自動で読み込みます。<br/>
+      読み込みに失敗した場合は、下の「手動アップロード」から復旧できます。
     </div>
   </div>
 </header>
@@ -109,7 +109,7 @@
 
   <!-- 手動アップロード（保険） -->
   <details class="card" style="margin-top:12px" open>
-    <summary style="cursor:pointer; font-weight:700">手動アップロード（保険）</summary>
+    <summary style="cursor:pointer; font-weight:700">手動アップロード</summary>
     <div class="note" style="margin-top:8px">
       <span class="warn">※通常は不要</span>：Auto読込が失敗したときだけ使ってください。
     </div>
@@ -156,7 +156,7 @@
       </div>
 
       <div class="note">
-        <span class="warn">注意：</span>ページ表示（GA4）はエクスポートされた期間の集計値です。日付フィルタで「後から再集計」はできません（必要なら別期間でGA出力→再アップロードしてください）。
+        <span class="warn">仕様：</span>ページ表示（GA4）はエクスポートされた期間の集計値です。日付フィルタで「後から再集計」はできません。
       </div>
     </div>
   </details>
@@ -165,7 +165,7 @@
     <div class="card">
       <h2>Google My Maps（緯度経度マップ）</h2>
       <div class="note">
-        My Maps は「地図を一般公開」している必要があります（公開されていないと埋め込みが表示されません）。
+        My Maps は「地図を一般公開」している必要があります。
         埋め込みは iframe で行います。My Maps の共有URL（mid=...）を貼るだけでOKです。
       </div>
       <div class="row" style="margin-top:8px">
@@ -299,7 +299,7 @@
   </section>
 
   <details class="card" style="margin-top:12px">
-    <summary style="cursor:pointer; font-weight:700">詳細（開発者向け）</summary>
+    <summary style="cursor:pointer; font-weight:700">詳細</summary>
     <div class="note" id="debug">未読み込み</div>
   </details>
 
