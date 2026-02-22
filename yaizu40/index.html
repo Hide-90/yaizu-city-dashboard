@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>焼津さかなセンター40周年｜来場者チャットログ分析ダッシュボード v2</title>
+<title>焼津さかなセンター40周年｜チャットログ分析ダッシュボード</title>
 <style>
 :root{
   --bg:#ffffff; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0; --card:#ffffff;
@@ -134,8 +134,8 @@ window.addEventListener('message', function(e){
 
 <header>
   <div class="wrap">
-    <h1>焼津さかなセンター40周年｜チャットログ分析ダッシュボード v2</h1>
-    <div class="sub">本ページはイベント当日の対話ログを集計し、来場者傾向を可視化したものです。</div>
+    <h1>焼津さかなセンター40周年｜チャットログ分析ダッシュボード</h1>
+    <div class="sub">本ページはイベント当日の対話ログを集計し、来場者傾向を可視化したものです。。</div>
     <div class="badges">
       <span class="badge" id="metaUU"></span>
       <span class="badge" id="metaGen"></span>
@@ -190,7 +190,7 @@ window.addEventListener('message', function(e){
 
 
   <div class="card">
-    <h2>フィルタ</h2>
+    <h2>フィルタ（結果共有でも操作可）</h2>
     <div class="controls">
       <div class="row">
         <div style="flex:1;min-width:200px;">
@@ -246,7 +246,7 @@ window.addEventListener('message', function(e){
 
     <div class="card">
       <h2>✅ ワードクラウド（Turn3自由入力の頻出語）</h2>
-      <div class="muted">※ 頻度に応じて文字サイズを変えたタグクラウドです。</div>
+      <div class="muted">※ 絵としての雲ではなく、頻度に応じて文字サイズを変えたタグクラウドです（環境依存を避けるため）。</div>
       <hr/>
       <div class="tagcloud" id="tagCloud"></div>
     </div>
@@ -254,7 +254,7 @@ window.addEventListener('message', function(e){
 
   <div class="card">
     <h2>✅ Sankey用データ（言語 → 圏域 → 興味）</h2>
-    <div class="muted">※ 軽量化のためテーブル形式。必要ならDLしたCSVをSankey描画ツールに投入できます。</div>
+    <div class="muted">※ 表示そのものは軽量化のためテーブル形式。必要ならDLしたCSVをSankey描画ツールに投入できます。</div>
     <div class="tableWrap" style="margin-top:10px;">
       <table>
         <thead><tr><th>source</th><th>target</th><th>value</th><th>stage</th></tr></thead>
@@ -315,17 +315,28 @@ function setMeta(){
   $('metaSrc').textContent = `source: ${agg.meta.source_file}`;
 }
 function setKPI(rows){
-  const uu = rows.length;
-  $('kUU').textContent = uu.toLocaleString('ja-JP');
+  // UU should be the TOTAL unique conversation_id count (e.g., 205), not the filtered row count.
+  const uuTotal = (agg && typeof agg.uu === 'number')
+    ? agg.uu
+    : uniq(summaries.map(r=>r.conversation_id)).length;
+
+  // Keep filtered denominator for step-reach KPIs so filters still behave naturally.
+  const uuFiltered = new Set(rows.map(r=>r.conversation_id).filter(Boolean)).size || rows.length;
+
+  $('kUU').textContent = uuTotal.toLocaleString('ja-JP');
+  $('kUU').title = `filtered UU: ${uuFiltered.toLocaleString('ja-JP')}`;
+
   const t1 = rows.filter(r=>r.region && String(r.region).trim()!=='').length;
   const t15 = rows.filter(r=>r.place && String(r.place).trim()!=='').length;
   const t2 = rows.filter(r=>r.interest && String(r.interest).trim()!=='').length;
   const t3 = rows.filter(r=>r.turn3_text && String(r.turn3_text).trim()!=='').length;
-  $('kT1').textContent = pct(t1, uu);
-  $('kT15').textContent = pct(t15, uu);
-  $('kT2').textContent = pct(t2, uu);
-  $('kT3').textContent = pct(t3, uu);
+
+  $('kT1').textContent = pct(t1, uuFiltered);
+  $('kT15').textContent = pct(t15, uuFiltered);
+  $('kT2').textContent = pct(t2, uuFiltered);
+  $('kT3').textContent = pct(t3, uuFiltered);
 }
+
 
 
 function renderFunnel(rows){
@@ -385,11 +396,24 @@ function renderFunnel(rows){
   el.appendChild(note);
 }
 
+// =========================
+// NORMALIZE HELPERS (FIX: keep unknown rows)
+// =========================
+const norm = (v)=>{
+  const s = (v===null || v===undefined) ? '' : String(v).trim();
+  return s ? s : '(unknown)';
+};
+
+function uniqNorm(arr){
+  const set = new Set();
+  for(const v of arr) set.add(norm(v));
+  return Array.from(set);
+}
+
 function countBy(rows, key){
   const m=new Map();
   for(const r of rows){
-    const k = r[key] ? String(r[key]).trim() : '(unknown)';
-    if(!k) continue;
+    const k = norm(r[key]);
     m.set(k, (m.get(k)||0)+1);
   }
   return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]);
@@ -568,15 +592,23 @@ function applyFilters(){
   const q=fPlace.value.trim().toLowerCase();
 
   const rows = summaries.filter(r=>{
-    const okLang = !langs.length || (r.lang && langs.includes(r.lang));
-    const okRegion = !regions.length || (r.region && regions.includes(r.region));
-    const okInterest = !interests.length || (r.interest && interests.includes(r.interest));
-    const okPlace = !q || (r.place && String(r.place).toLowerCase().includes(q));
+    const langN = norm(r.lang);
+    const regionN = norm(r.region);
+    const interestN = norm(r.interest);
+    const placeRaw = (r.place===null || r.place===undefined) ? '' : String(r.place);
+
+    const okLang = !langs.length || langs.includes(langN);
+    const okRegion = !regions.length || regions.includes(regionN);
+    const okInterest = !interests.length || interests.includes(interestN);
+    // place は未知扱いにせず「部分一致検索」なので raw を使う（空はヒットしない）
+    const okPlace = !q || placeRaw.toLowerCase().includes(q);
+
     return okLang && okRegion && okInterest && okPlace;
   });
 
   setKPI(rows);
   renderFunnel(rows);
+
   renderBarList(document.getElementById('regionBars'), countBy(rows,'region'));
   renderBarList(document.getElementById('placeBars'), countBy(rows,'place'), 20);
   renderCross(rows);
@@ -608,17 +640,21 @@ function resetFilters(){
 
 function init(){
   setMeta();
-  fillSelect(fLang, uniq(summaries.map(r=>r.lang)).length ? uniq(summaries.map(r=>r.lang)) : ['(unknown)']);
-  fillSelect(fRegion, uniq(summaries.map(r=>r.region)).length ? uniq(summaries.map(r=>r.region)) : ['(unknown)']);
-  fillSelect(fInterest, uniq(summaries.map(r=>r.interest)).length ? uniq(summaries.map(r=>r.interest)) : ['(unknown)']);
+
+  fillSelect(fLang, uniqNorm(summaries.map(r=>r.lang)));
+  fillSelect(fRegion, uniqNorm(summaries.map(r=>r.region)));
+  fillSelect(fInterest, uniqNorm(summaries.map(r=>r.interest)));
+
   applyFilters();
 
   document.getElementById('applyBtn').addEventListener('click', applyFilters);
   document.getElementById('resetBtn').addEventListener('click', resetFilters);
+
   document.getElementById('dlSummaryBtn').addEventListener('click', ()=>{
     const rows = window.__filteredRows || summaries;
     downloadText('yaizu_chat_summary_filtered.csv', toCSV(rows, ['conversation_id','lang','region','place','interest','turn3_text','started_at']));
   });
+
   document.getElementById('dlSankeyBtn').addEventListener('click', ()=>{
     const links = window.__filteredSankey || buildSankeyLinks(summaries);
     downloadText('yaizu_sankey_links_filtered.csv', toCSV(links, ['source','target','value','stage']));
