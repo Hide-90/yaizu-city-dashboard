@@ -3,293 +3,250 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>焼津さかなセンター40周年｜イベント分析ダッシュボード（単体HTML）</title>
-
-<!-- External libs (CDN). If you need fully offline, tell me and I’ll inline/minify later. -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
-
+<title>焼津さかなセンター40周年｜チャットログ分析ダッシュボード</title>
 <style>
-  :root{
-    --bg:#ffffff; --fg:#111111; --muted:#6b7280; --card:#ffffff; --border:#e5e7eb;
-    --blue:#2563eb; --blue2:#1d4ed8; --green:#10b981; --amber:#f59e0b; --red:#ef4444;
-    --shadow: 0 12px 30px rgba(0,0,0,.08);
-    --radius: 18px;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;
-    background:var(--bg); color:var(--fg);
-  }
-  header{
-    position:sticky; top:0; z-index:10;
-    background:rgba(255,255,255,.92); backdrop-filter: blur(10px);
-    border-bottom:1px solid var(--border);
-  }
-  .wrap{max-width:1200px; margin:0 auto; padding:18px 16px;}
-  .title{
-    display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
-  }
-  .title h1{margin:0; font-size:20px; letter-spacing:.2px;}
-  .title .sub{color:var(--muted); font-size:12px;}
-  .grid{
-    display:grid;
-    grid-template-columns: 1.2fr .8fr;
-    gap:16px;
-    padding:16px;
-    max-width:1200px;
-    margin:0 auto;
-  }
-  @media (max-width: 980px){
-    .grid{grid-template-columns:1fr}
-  }
-  .card{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    box-shadow: var(--shadow);
-    padding:16px;
-  }
-  .card h2{
-    margin:0 0 8px 0;
-    font-size:16px;
-    display:flex; align-items:center; gap:8px;
-  }
-  .muted{color:var(--muted)}
-  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
-  .pill{
-    display:inline-flex; align-items:center; gap:6px;
-    padding:6px 10px; border-radius:999px;
-    border:1px solid var(--border);
-    background:#fff;
-    font-size:12px;
-  }
-  .btn{
-    border:1px solid var(--border);
-    background:#fff;
-    padding:10px 12px;
-    border-radius:12px;
-    cursor:pointer;
-    font-weight:600;
-  }
-  .btn:hover{border-color:#cbd5e1}
-  .btn.primary{
-    background: linear-gradient(180deg, #2563eb, #1d4ed8);
-    border-color:#1d4ed8;
-    color:#fff;
-  }
-  .btn.primary:hover{filter:brightness(1.03)}
-  .kpis{
-    display:grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
-    gap:10px;
-    margin-top:10px;
-  }
-  @media (max-width: 980px){
-    .kpis{grid-template-columns: repeat(2, minmax(0,1fr))}
-  }
-  .kpi{
-    border:1px solid var(--border);
-    border-radius:16px;
-    padding:12px 12px;
-    background:#fff;
-  }
-  .kpi .lab{font-size:12px; color:var(--muted); margin-bottom:6px}
-  .kpi .val{font-size:20px; font-weight:800}
-  .kpi .hint{font-size:12px; color:var(--muted); margin-top:6px}
-  .filters{
-    display:grid;
-    grid-template-columns: repeat(2, minmax(0,1fr));
-    gap:10px;
-    margin-top:10px;
-  }
-  @media (max-width: 640px){
-    .filters{grid-template-columns:1fr}
-  }
-  .field label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px 2px}
-  select, input[type="text"]{
-    width:100%;
-    padding:10px 10px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    outline:none;
-    background:#fff;
-  }
-  select:focus, input[type="text"]:focus{border-color:#93c5fd; box-shadow:0 0 0 4px rgba(59,130,246,.12)}
-  .charts{
-    display:grid;
-    grid-template-columns: repeat(2, minmax(0,1fr));
-    gap:10px;
-    margin-top:10px;
-  }
-  @media (max-width: 980px){
-    .charts{grid-template-columns:1fr}
-  }
-  canvas{max-width:100%}
-  .small{font-size:12px}
-  .hr{height:1px; background:var(--border); margin:12px 0}
-  .tagCloud{
-    display:flex; flex-wrap:wrap; gap:8px;
-    padding:8px 2px 2px 2px;
-  }
-  .tag{
-    display:inline-flex; align-items:center; gap:8px;
-    padding:8px 10px;
-    border-radius:999px;
-    border:1px solid var(--border);
-    background:#fff;
-    white-space:nowrap;
-  }
-  .tag b{font-weight:900}
-  .tag span{color:var(--muted); font-weight:700}
-  .note{
-    margin:8px 0 0 0;
-    color:var(--muted);
-    font-size:12px;
-    line-height:1.5;
-  }
-  .warn{
-    background:#fff7ed;
-    border:1px solid #fed7aa;
-    color:#7c2d12;
-    padding:10px 12px;
-    border-radius:14px;
-    font-size:12px;
-  }
-  .ok{
-    background:#ecfdf5;
-    border:1px solid #a7f3d0;
-    color:#065f46;
-    padding:10px 12px;
-    border-radius:14px;
-    font-size:12px;
-  }
-  .rightBox{
-    display:grid; gap:16px;
-  }
-  .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas, "Liberation Mono","Courier New",monospace}
+:root{
+  --bg:#f6f8fb;
+  --card:#ffffff;
+  --fg:#111827;
+  --muted:#6b7280;
+  --border:#e5e7eb;
+  --blue:#2563eb;
+  --green:#16a34a;
+  --orange:#f97316;
+  --shadow:0 12px 30px rgba(0,0,0,.08);
+  --radius:18px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+  background:var(--bg);
+  color:var(--fg);
+}
+.container{max-width:1100px;margin:0 auto;padding:18px}
+h1{font-size:20px;margin:0 0 8px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.grid{
+  display:grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap:14px;
+}
+.card{
+  grid-column: span 12;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:14px 14px;
+}
+.card h2{
+  margin:0 0 10px;
+  font-size:16px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+  background:#fff;
+  font-size:12px;color:var(--muted)
+}
+.kpis{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:12px;
+}
+.kpi{
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:12px;
+  background:#fff;
+}
+.kpi .label{color:var(--muted);font-size:12px}
+.kpi .value{font-size:20px;font-weight:800;margin-top:2px}
+.row{
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center
+}
+.btn{
+  appearance:none;
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:10px 14px;
+  background:#fff;
+  cursor:pointer;
+  font-weight:700;
+}
+.btn.primary{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.note{color:var(--muted);font-size:12px;margin-top:8px}
+hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0}
+.filters{
+  display:grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap:10px;
+  align-items:end;
+}
+.field{
+  grid-column: span 3;
+}
+.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+select,input{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+  font-size:14px;
+}
+@media (max-width: 920px){
+  .kpis{grid-template-columns: repeat(2, 1fr)}
+  .field{grid-column: span 6}
+}
+@media (max-width: 560px){
+  .kpis{grid-template-columns: 1fr}
+  .field{grid-column: span 12}
+}
+.table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:16px;
+}
+.table th,.table td{
+  padding:10px 10px;
+  border-bottom:1px solid var(--border);
+  font-size:13px;
+  vertical-align:top;
+}
+.table th{
+  background:#f9fafb;
+  text-align:left;
+  color:#374151;
+  font-weight:800;
+}
+.table tr:last-child td{border-bottom:none}
+.small{font-size:12px;color:var(--muted)}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid #dbeafe;
+  background:#eff6ff;
+  color:#1d4ed8;
+  border-radius:999px;
+  font-weight:800;
+}
+.tagCloud{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:flex-start;
+}
+.tag{
+  display:inline-flex;
+  align-items:baseline;
+  gap:10px;
+  padding:8px 12px;
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:999px;
+}
+.tag .w{font-weight:900}
+.tag .c{color:var(--muted);font-weight:800}
+.legend{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.dot{width:10px;height:10px;border-radius:999px;display:inline-block}
+.dot.blue{background:var(--blue)}
+.dot.green{background:var(--green)}
+.dot.orange{background:var(--orange)}
+.footer{color:var(--muted);font-size:12px;margin-top:14px}
 </style>
 </head>
 <body>
+<div class="container">
+  <h1>焼津さかなセンター40周年｜チャットログ分析ダッシュボード</h1>
+  <p class="sub">※ 本ページはイベント当日の対話ログを集計し、来場者傾向を可視化したものです。</p>
 
-<header>
-  <div class="wrap">
-    <div class="title">
-      <div>
-        <h1>焼津さかなセンター40周年｜イベント分析ダッシュボード</h1>
-        <div class="sub">単体HTML / CSV自動読込（またはアップロード） / Turnデータ可視化</div>
-      </div>
-      <div class="row">
-        <button class="btn" id="btnReload">再読込</button>
-        <button class="btn primary" id="btnReset">フィルタ解除</button>
-      </div>
-    </div>
+  <div class="grid">
+    <section class="card">
+      <h2>✅ サマリー</h2>
+      <div class="kpis" id="kpis"></div>
+      <div class="note">※ フィルタ適用後の集計値です。</div>
+    </section>
 
-    <div class="kpis" id="kpis">
-      <div class="kpi"><div class="lab">総セッション数（行数）</div><div class="val" id="kpiSessions">-</div><div class="hint">フィルタ後</div></div>
-      <div class="kpi"><div class="lab">Turn0（言語）</div><div class="val" id="kpiLangs">-</div><div class="hint">ユニーク数</div></div>
-      <div class="kpi"><div class="lab">Turn1（地域）</div><div class="val" id="kpiRegions">-</div><div class="hint">ユニーク数</div></div>
-      <div class="kpi"><div class="lab">Turn2（興味）</div><div class="val" id="kpiInterests">-</div><div class="hint">ユニーク数</div></div>
-    </div>
+    <section class="card">
+      <h2>🔎 フィルタ</h2>
+      <div class="filters">
+        <div class="field">
+          <label>言語</label>
+          <select id="fLang" multiple size="5"></select>
+        </div>
+        <div class="field">
+          <label>地域（来場属性）</label>
+          <select id="fRegion" multiple size="5"></select>
+        </div>
+        <div class="field">
+          <label>興味・関心</label>
+          <select id="fInterest" multiple size="5"></select>
+        </div>
+        <div class="field">
+          <label>Turn1.5（自由入力：どこから？）を含む</label>
+          <input id="fPlace" placeholder="例：浜松 / Tokyo / Indonesia など"/>
+        </div>
+      </div>
 
-    <div class="filters">
-      <div class="field">
-        <label>言語（Turn0）</label>
-        <select id="fLang" multiple size="4"></select>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btnApply">フィルタ適用</button>
+        <button class="btn" id="btnReset">リセット</button>
+        <span class="badge" id="hit"></span>
       </div>
-      <div class="field">
-        <label>地域（Turn1）</label>
-        <select id="fRegion" multiple size="4"></select>
-      </div>
-      <div class="field">
-        <label>興味（Turn2）</label>
-        <select id="fInterest" multiple size="4"></select>
-      </div>
-      <div class="field">
-        <label>自由入力（Turn1.5 / 例: 浜松 / 台北 / Indonesia）</label>
-        <input id="fPlace" type="text" placeholder="キーワードで絞り込み（部分一致）">
-      </div>
-    </div>
+      <div class="note">※ 複数選択：Windows は Ctrl / Mac は ⌘ を押しながら選択</div>
+    </section>
 
-    <div class="row" style="margin-top:10px">
-      <div class="pill">データ: <b id="dataMode">-</b></div>
-      <div class="pill">最終更新: <b id="dataUpdated">-</b></div>
-      <div class="pill">行数: <b id="dataRows">-</b></div>
-      <div class="pill mono">source: <span id="dataSource">-</span></div>
-    </div>
+    <section class="card">
+      <h2>✅ ワードクラウド（Turn3自由入力の頻出語）</h2>
+      <div class="small">※ ユーザー入力の頻度に応じて文字サイズを変えたタグクラウドです。</div>
+      <hr class="sep"/>
+      <div class="tagCloud" id="tagCloud"></div>
+      <div class="note">※ 助詞・接続詞・ですます等は除外し、「名詞っぽい語」を優先するように調整済み。</div>
+    </section>
 
+    <section class="card">
+      <h2>📋 直近ログ（抜粋）</h2>
+      <table class="table" id="tbl">
+        <thead>
+          <tr>
+            <th style="width:120px">言語</th>
+            <th style="width:160px">地域</th>
+            <th style="width:160px">興味</th>
+            <th>Turn1.5（どこから？）</th>
+            <th>Turn3（自由入力）</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="footer">※ 表示は上位50件まで（フィルタ結果の先頭から）</div>
+    </section>
   </div>
-</header>
-
-<main class="grid">
-  <section class="card">
-    <h2>📊 集計</h2>
-    <div class="charts">
-      <div class="card" style="box-shadow:none">
-        <h2 style="margin:0 0 8px 0; font-size:14px">言語（Turn0）</h2>
-        <canvas id="chartLang"></canvas>
-      </div>
-      <div class="card" style="box-shadow:none">
-        <h2 style="margin:0 0 8px 0; font-size:14px">興味（Turn2）</h2>
-        <canvas id="chartInterest"></canvas>
-      </div>
-      <div class="card" style="box-shadow:none">
-        <h2 style="margin:0 0 8px 0; font-size:14px">地域（Turn1）</h2>
-        <canvas id="chartRegion"></canvas>
-      </div>
-      <div class="card" style="box-shadow:none">
-        <h2 style="margin:0 0 8px 0; font-size:14px">自由入力（Turn1.5）上位</h2>
-        <div class="small muted">※ 正規化して集計（空は (unknown)）</div>
-        <div id="topPlaces" class="small" style="margin-top:8px"></div>
-      </div>
-    </div>
-
-    <div class="hr"></div>
-
-    <div class="row">
-      <div class="warn" style="flex:1">
-        <b>ヒント：</b>複数選択（Shift/Ctrl）でフィルタを組み合わせられます。入力欄は部分一致です。
-      </div>
-    </div>
-  </section>
-
-  <aside class="rightBox">
-    <section class="card">
-      <h2>🧠 ワードクラウド（Turn3自由入力の頻出語）</h2>
-      <p class="note">※ 助詞・接続詞など意味が薄い語は除外し、名詞に寄せた頻出語を表示します（ブラウザ内での簡易推定／環境依存を避けるため、完全な形態素解析は行いません）。</p>
-      <div id="tagCloud" class="tagCloud"></div>
-    </section>
-
-    <section class="card">
-      <h2>📥 データ読み込み</h2>
-      <div class="small muted">基本は自動読込。うまくいかない場合はアップロードでもOK。</div>
-      <div class="hr"></div>
-
-      <div class="row">
-        <button class="btn" id="btnAuto">自動読込（CSV）</button>
-        <label class="btn" style="cursor:pointer">
-          ファイルを選択（CSV / XLSX）
-          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none">
-        </label>
-      </div>
-
-      <div class="hr"></div>
-      <div id="loadStatus" class="ok">準備完了</div>
-      <div class="note mono" id="debug"></div>
-    </section>
-  </aside>
-</main>
+</div>
 
 <script>
 // =========================
-// DATA SOURCE (Auto CSV)
+// Embedded DATA (original)
 // =========================
-// 例）同階層に summary.csv を置く（GitHub PagesでもOK）
-const AUTO_CSV_URL = "./summary.csv"; // ←必要に応じて変更
+const DATA = {"summaries":[{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"},{"lang":"Japanese","region":"静岡県内","interest":"丼・海鮮","turn1_5_place":"浜松","turn3_text":"おすすめの海鮮丼を教えてください"}],"agg":{"total_rows":0,"lang_counts":{},"region_counts":{},"interest_counts":{},"word_freq":[]}}; // ←元の埋め込みデータを保持（word_freq は使用しません）
 
 // =========================
-// NORMALIZE HELPERS (FIX: keep unknown rows)
+// NORMALIZE HELPERS
 // =========================
 const norm = (v)=>{
   const s = (v===null || v===undefined) ? '' : String(v).trim();
@@ -311,68 +268,178 @@ function countBy(rows, key){
   return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]);
 }
 
-// =========================
-// STATE
-// =========================
-let summaries = [];  // unified rows
-let charts = {};
-let lastUpdated = null;
-let currentSource = '(none)';
-
-// =========================
-// DOM
-// =========================
-const fLang = document.getElementById('fLang');
-const fRegion = document.getElementById('fRegion');
-const fInterest = document.getElementById('fInterest');
-const fPlace = document.getElementById('fPlace');
-
-const tagCloud = document.getElementById('tagCloud');
-const topPlaces = document.getElementById('topPlaces');
-const loadStatus = document.getElementById('loadStatus');
-
-const kpiSessions = document.getElementById('kpiSessions');
-const kpiLangs = document.getElementById('kpiLangs');
-const kpiRegions = document.getElementById('kpiRegions');
-const kpiInterests = document.getElementById('kpiInterests');
-
-const dataMode = document.getElementById('dataMode');
-const dataUpdated = document.getElementById('dataUpdated');
-const dataRows = document.getElementById('dataRows');
-const dataSource = document.getElementById('dataSource');
-const debug = document.getElementById('debug');
-
-// =========================
-// UI HELPERS
-// =========================
-function setStatus(kind, msg){
-  loadStatus.className = kind==='ok' ? 'ok' : 'warn';
-  loadStatus.textContent = msg;
-}
-
-function fillSelect(sel, values){
-  sel.innerHTML='';
-  const opts = values.slice().sort((a,b)=>String(a).localeCompare(String(b),'ja'));
-  for(const v of opts){
-    const o=document.createElement('option');
-    o.value=v; o.textContent=v;
-    sel.appendChild(o);
-  }
-}
-
 function selected(sel){
   return Array.from(sel.selectedOptions).map(o=>o.value);
 }
 
-function formatDT(d){
-  if(!d) return '-';
-  const pad=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+// =========================
+// WORD FREQ (FIXED: noun-like tokens)
+// =========================
+function buildWordFreq(rows){
+  // Build keyword frequency for the Turn3 free-text.
+  // Goal: keep mostly "noun-like" tokens (reduce particles/conjunctions/etc).
+  // Note: Pure POS-tagging is not available without heavy NLP libs, so we use:
+  // 1) lightweight segmentation, 2) stopword removal, 3) script/length heuristics.
+
+  // --- Lightweight tokenizer ---
+  // We keep this dashboard dependency-free. This tokenizer splits by:
+  // - Japanese vs non-Japanese boundaries
+  // - punctuation/whitespace
+  // Then we apply stopwords + heuristics to approximate nouns.
+  function lightSegment(input){
+    const s = String(input||"");
+    const out=[];
+    let buf="";
+    const flush=()=>{ if(buf){ out.push(buf); buf=""; } };
+    for(const ch of s){
+      const isJa = /[一-龯ぁ-ゖァ-ヴー]/.test(ch);
+      const isAlnum = /[A-Za-z0-9]/.test(ch);
+      if(isJa){
+        if(buf && !/[一-龯ぁ-ゖァ-ヴー]/.test(buf[buf.length-1])) flush();
+        buf+=ch;
+      }else if(isAlnum){
+        if(buf && !/[A-Za-z0-9]/.test(buf[buf.length-1])) flush();
+        buf+=ch;
+      }else{
+        flush();
+      }
+    }
+    flush();
+    // Further split overly long Japanese chunks (avoid producing many 1-char tokens)
+    const final=[];
+    for(const t of out){
+      if(/[一-龯ぁ-ゖァ-ヴー]/.test(t) && t.length>10){
+        // Prefer Kanji compounds when possible
+        const kanji = t.match(/[一-龯]{2,}/g) || [];
+        if(kanji.length){
+          kanji.forEach(x=>final.push(x));
+          const rest = t.replace(/[一-龯]{2,}/g," ");
+          rest.split(/\s+/).filter(Boolean).forEach(x=>final.push(x));
+        }else{
+          for(let i=0;i<t.length;i+=4) final.push(t.slice(i,i+4));
+        }
+      }else{
+        final.push(t);
+      }
+    }
+    return final.filter(Boolean);
+  }
+
+  // --- Stopwords ---
+  const JA_STOP = buildWordFreq._jaStop || (buildWordFreq._jaStop = new Set([
+    // particles / auxiliaries / conjunctions / fillers
+    "の","こと","これ","それ","あれ","ここ","そこ","あそこ","どこ","こちら","あちら","そちら","どちら",
+    "です","ます","でした","ません","ない","ある","いる","なる","する","した","して","してる","してい",
+    "て","で","に","を","は","が","と","も","へ","や","から","まで","より","など","とか","そして","また","しかし","でも",
+    "この","その","あの","どの","ため","ので","よう","ように","さん","さま","様",
+    "お願い","ください","下さい","教え","教えて","教えてください","教えて下さい","お願いします",
+    "ありがとう","ありがとうございます","こんにちは","こんばんは","おはよう","よろしく",
+    "ですか","ますか","ました","でした","けど","けれど","けれども",
+    "ほしい","欲しい","みたい","みたいな","感じ","ところ","もの","人","私","わたし","僕","ぼく","俺","おれ",
+    "今日","明日","昨日","今","いま",
+    // noise tokens (common from the old bigram method)
+    "お","す","め","て","し","い","の海","を教","マグ","グロ","口丼","井を","の店","井の","オス","スス","スメ"
+  ]));
+
+  const EN_STOP = buildWordFreq._enStop || (buildWordFreq._enStop = new Set([
+    "the","a","an","and","or","but","so","to","of","in","on","at","for","from","with","without","about","into","over","under",
+    "is","are","was","were","be","been","being","do","does","did","done","have","has","had","will","would","can","could","should",
+    "i","you","we","they","he","she","it","this","that","these","those","here","there","please","thanks","thank","hello"
+  ]));
+
+  // --- Heuristics ---
+  const cleanJa = (t)=>t.replace(/^[^一-龯ぁ-ゖァ-ヴー]+|[^一-龯ぁ-ゖァ-ヴー]+$/g,"");
+  const hasKanji = (t)=>/[一-龯]/.test(t);
+  const hasKata  = (t)=>/[ァ-ヴー]/.test(t);
+  const isAllHira = (t)=>/^[ぁ-ゖ]+$/.test(t);
+  const isAllJa = (t)=>/^[一-龯ぁ-ゖァ-ヴー]+$/.test(t);
+
+  function keepJaToken(t){
+    if(!t) return false;
+    if(JA_STOP.has(t)) return false;
+    if(t.length < 2) return false;
+    if(/^\d+$/.test(t)) return false;
+    if(!isAllJa(t)) return false;
+
+    // Prefer Kanji/Katakana compounds (often nouns)
+    if(hasKanji(t) || hasKata(t)) return true;
+
+    // Hiragana-only words can be nouns too (e.g., すし, まぐろ, やいづ)
+    if(isAllHira(t) && t.length >= 2) return true;
+
+    return false;
+  }
+
+  const add = (map, token)=> map.set(token, (map.get(token)||0)+1);
+
+  const rowsTexts = rows
+    .map(r=>r.turn3_text)
+    .filter(v=>v!==null && v!==undefined)
+    .map(String);
+
+  const freq = new Map();
+
+  for(const raw of rowsTexts){
+    const text = raw
+      .replace(/https?:\/\/\S+/g," ")
+      .replace(/[#@][\w\-]+/g," ")
+      .replace(/[0-9]{2,}/g," ")
+      .replace(/[「」『』（）()\[\]{}<>]/g," ")
+      .replace(/[、。！？!?,.:;／\/\\|]/g," ")
+      .replace(/\s+/g," ")
+      .trim();
+
+    if(!text) continue;
+
+    // English tokens
+    text.split(/[^A-Za-z]+/).forEach(w=>{
+      const t=w.trim().toLowerCase();
+      if(t.length>=3 && !EN_STOP.has(t)) add(freq, t);
+    });
+
+    // Japanese tokens
+    const jaText = text.replace(/[A-Za-z0-9_]+/g," ");
+    const toks = lightSegment(jaText);
+    for(let tok of toks){
+      tok = cleanJa(tok);
+      if(!tok) continue;
+      if(keepJaToken(tok)) add(freq, tok);
+    }
+
+    // Directly capture compounds (helps a lot)
+    (jaText.match(/[一-龯]{2,}/g)||[]).forEach(k=>{ if(keepJaToken(k)) add(freq,k); });
+    (jaText.match(/[ァ-ヴー]{2,}/g)||[]).forEach(k=>{ if(keepJaToken(k)) add(freq,k); });
+    (jaText.match(/[ぁ-ゖ]{2,}/g)||[]).forEach(k=>{ if(keepJaToken(k) && !JA_STOP.has(k)) add(freq,k); });
+  }
+
+  return Array.from(freq.entries())
+    .filter(([w,c])=>c>=2)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,140);
 }
 
 // =========================
-// FILTERS (FIX: compare with normalized values)
+// UI / Render
 // =========================
+const summaries = (DATA && DATA.summaries) ? DATA.summaries : [];
+
+const fLang=document.getElementById('fLang');
+const fRegion=document.getElementById('fRegion');
+const fInterest=document.getElementById('fInterest');
+const fPlace=document.getElementById('fPlace');
+const btnApply=document.getElementById('btnApply');
+const btnReset=document.getElementById('btnReset');
+const hit=document.getElementById('hit');
+
+function fillSelect(selectEl, values){
+  selectEl.innerHTML='';
+  for(const v of values){
+    const opt=document.createElement('option');
+    opt.value=v; opt.textContent=v;
+    selectEl.appendChild(opt);
+  }
+}
+
 function applyFilters(){
   const langs=selected(fLang);
   const regions=selected(fRegion);
@@ -383,357 +450,112 @@ function applyFilters(){
     const langN = norm(r.lang);
     const regionN = norm(r.region);
     const interestN = norm(r.interest);
-    const placeN = norm(r.place).toLowerCase();
+    const place = norm(r.turn1_5_place).toLowerCase();
 
-    if(langs.length && !langs.includes(langN)) return false;
-    if(regions.length && !regions.includes(regionN)) return false;
-    if(interests.length && !interests.includes(interestN)) return false;
-    if(q && !placeN.includes(q)) return false;
-    return true;
+    const okLang = (langs.length===0) || langs.includes(langN);
+    const okRegion = (regions.length===0) || regions.includes(regionN);
+    const okInterest = (interests.length===0) || interests.includes(interestN);
+    const okQ = (!q) || place.includes(q);
+
+    return okLang && okRegion && okInterest && okQ;
   });
 
-  renderAll(rows);
+  render(rows);
 }
 
 function resetFilters(){
-  Array.from(fLang.options).forEach(o=>o.selected=false);
-  Array.from(fRegion.options).forEach(o=>o.selected=false);
-  Array.from(fInterest.options).forEach(o=>o.selected=false);
+  fLang.selectedIndex=-1;
+  fRegion.selectedIndex=-1;
+  fInterest.selectedIndex=-1;
   fPlace.value='';
-  applyFilters();
+  render(summaries);
 }
 
-// =========================
-// CHARTS
-// =========================
-function makeChart(id, labels, data){
-  const ctx=document.getElementById(id);
-  if(charts[id]) charts[id].destroy();
+function renderKpis(rows){
+  const kpis=document.getElementById('kpis');
+  const total=rows.length;
 
-  charts[id]=new Chart(ctx,{
-    type:'bar',
-    data:{labels, datasets:[{label:'count', data}]},
-    options:{
-      responsive:true,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{ticks:{autoSkip:false, maxRotation:60, minRotation:0}},
-        y:{beginAtZero:true}
-      }
-    }
-  });
+  const langTop = countBy(rows,'lang')[0] || ['-',0];
+  const regTop  = countBy(rows,'region')[0] || ['-',0];
+  const intTop  = countBy(rows,'interest')[0] || ['-',0];
+
+  kpis.innerHTML = `
+    <div class="kpi"><div class="label">対象ログ数</div><div class="value">${total}</div></div>
+    <div class="kpi"><div class="label">最多言語</div><div class="value">${langTop[0]}</div><div class="small">${langTop[1]}件</div></div>
+    <div class="kpi"><div class="label">最多地域</div><div class="value">${regTop[0]}</div><div class="small">${regTop[1]}件</div></div>
+    <div class="kpi"><div class="label">最多興味</div><div class="value">${intTop[0]}</div><div class="small">${intTop[1]}件</div></div>
+  `;
 }
 
-// =========================
-// WORD CLOUD (Tag-style) — noun-ish
-// =========================
-function buildWordFreq(rows){
-  // Build a "noun-ish" frequency list from Turn3 free-text.
-  // (No morphological analyzer in browser, so we use robust heuristics + stopwords.)
-  const texts = rows.map(r=>r.turn3_text).filter(v=>v!==null && v!==undefined && String(v).trim()!=='').map(String);
-  const joined = texts.join(' ');
-
-  // --- Stopwords (JP) ---
-  const JP_STOP = new Set([
-    // particles / auxiliaries
-    'の','こと','もの','これ','それ','あれ','ここ','そこ','あそこ','こちら','そちら','あちら',
-    'は','が','を','に','へ','と','で','も','や','から','まで','より','など','だけ','ほど','くらい',
-    'そして','しかし','でも','また','または','つまり','なので','だから','けど','けれど','さらに','ちなみに',
-    // polite / common function words
-    'です','ます','でした','ません','ください','お願い','ありがとう','ありがとうございます',
-    // common chat filler
-    '今日','今','いま','今回','こちら','こちらこそ',
-    // very generic tourism / shop words (optional, keep if you want)
-    // 'お店','おみせ','店'
-  ]);
-
-  // --- Stopwords (EN) ---
-  const EN_STOP = new Set([
-    'the','and','or','but','to','of','in','on','for','with','at','by','from','as','is','are','was','were','be','been','being',
-    'i','you','we','they','he','she','it','this','that','these','those','there','here','please','thanks','thank'
-  ]);
-
-  function isAllHiragana(s){ return /^[ぁ-んー]+$/.test(s); }
-  function isAllKatakana(s){ return /^[ァ-ンー]+$/.test(s); }
-
-  function looksLikeVerbEndingJP(t){
-    // Exclude typical verb/auxiliary endings so we bias toward nouns.
-    // (Heuristic; tune freely.)
-    return /(する|して|した|してる|していた|してます|したい|できる|です|ます|でした|ません|ない|なかった|たい|てる|って)$/.test(t);
+function renderTable(rows){
+  const tbody=document.querySelector('#tbl tbody');
+  tbody.innerHTML='';
+  const head = rows.slice(0,50);
+  for(const r of head){
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td>${norm(r.lang)}</td>
+      <td>${norm(r.region)}</td>
+      <td>${norm(r.interest)}</td>
+      <td>${norm(r.turn1_5_place)}</td>
+      <td>${norm(r.turn3_text)}</td>
+    `;
+    tbody.appendChild(tr);
   }
-
-  function keepJPToken(t){
-    if(!t) return false;
-    if(JP_STOP.has(t)) return false;
-
-    // Drop very short tokens
-    if(t.length<=1) return false;
-
-    // Drop pure hiragana short words (often particles/aux)
-    if(isAllHiragana(t)){
-      if(t.length<=3) return false;
-      // longer hiragana may still be a noun (e.g., さかな) -> keep if not stopword
-      return !JP_STOP.has(t);
-    }
-
-    // Drop katakana too short
-    if(isAllKatakana(t) && t.length<=1) return false;
-
-    // Bias away from verbs/aux if it ends like a verb
-    if(looksLikeVerbEndingJP(t)) return false;
-
-    return true;
-  }
-
-  function keepENToken(t){
-    if(!t) return false;
-    if(t.length<3) return false;
-    if(EN_STOP.has(t)) return false;
-    return true;
-  }
-
-  const tokens = [];
-
-  // English words
-  (joined.match(/[A-Za-z]{3,}/g) || []).forEach(w=>{
-    const t=w.toLowerCase();
-    if(keepENToken(t)) tokens.push(t);
-  });
-
-  // Numbers / alphanum chunks (optional)
-  (joined.match(/[A-Za-z0-9]{3,}/g) || []).forEach(w=>{
-    const t=w.toLowerCase();
-    if(keepENToken(t)) tokens.push(t);
-  });
-
-  // Japanese "noun-ish" chunks:
-  // 1) Kanji sequences (2+)
-  (joined.match(/[一-龯々〆ヵヶ]{2,}/g) || []).forEach(t=>{
-    if(keepJPToken(t)) tokens.push(t);
-  });
-
-  // 2) Katakana sequences (2+)
-  (joined.match(/[ァ-ンー]{2,}/g) || []).forEach(t=>{
-    if(keepJPToken(t)) tokens.push(t);
-  });
-
-  // 3) Mixed Kanji+Hiragana (e.g., 海鮮丼, おすすめ, 教えて) — keep if passes heuristics
-  (joined.match(/[一-龯々〆ヵヶ]+[ぁ-んー]{1,4}/g) || []).forEach(t=>{
-    if(keepJPToken(t)) tokens.push(t);
-  });
-
-  // 4) Longer hiragana nouns (4+)
-  (joined.match(/[ぁ-んー]{4,}/g) || []).forEach(t=>{
-    if(keepJPToken(t)) tokens.push(t);
-  });
-
-  const m=new Map();
-  for(const t of tokens) m.set(t,(m.get(t)||0)+1);
-
-  // keep >=2 and cap
-  const list = Array.from(m.entries())
-    .filter(([w,c])=>c>=2)
-    .sort((a,b)=>b[1]-a[1])
-    .slice(0,140);
-
-  return list;
 }
 
 function renderTagCloud(rows){
-  const wf = buildWordFreq(rows);
-  tagCloud.innerHTML = '';
-  if(!wf.length){
-    tagCloud.innerHTML = '<div class="muted small">（頻出語がありません）</div>';
+  const tagCloud=document.getElementById('tagCloud');
+  tagCloud.innerHTML='';
+  const list = buildWordFreq(rows); // ←ここが修正ポイント
+  if(!list.length){
+    tagCloud.innerHTML = `<div class="small">（該当データが少ないため、頻出語が表示できません）</div>`;
     return;
   }
-  const counts = wf.map(x=>x[1]);
-  const max = Math.max(...counts);
-  const min = Math.min(...counts);
-
-  for(const [w,c] of wf){
-    const t=document.createElement('div');
-    t.className='tag';
-
-    // size 12..34
-    const s = (max===min) ? 18 : (12 + (c-min) * (34-12) / (max-min));
-    t.style.fontSize = `${s.toFixed(1)}px`;
-
-    const b=document.createElement('b'); b.textContent=w;
-    const sp=document.createElement('span'); sp.textContent=c;
-
-    t.appendChild(b);
-    t.appendChild(sp);
-    tagCloud.appendChild(t);
-  }
-}
-
-// =========================
-// TOP PLACE LIST
-// =========================
-function renderTopPlaces(rows){
-  const pairs = countBy(rows, 'place').slice(0,12);
-  if(!pairs.length){
-    topPlaces.innerHTML = '<div class="muted">（該当なし）</div>';
-    return;
-  }
-  topPlaces.innerHTML = pairs.map(([k,v])=>{
-    return `<div class="pill"><b>${escapeHtml(k)}</b> <span class="muted">${v}</span></div>`;
-  }).join(' ');
-}
-
-// =========================
-// RENDER ALL
-// =========================
-function renderAll(rows){
-  // KPIs
-  kpiSessions.textContent = rows.length;
-  kpiLangs.textContent = uniqNorm(rows.map(r=>r.lang)).length;
-  kpiRegions.textContent = uniqNorm(rows.map(r=>r.region)).length;
-  kpiInterests.textContent = uniqNorm(rows.map(r=>r.interest)).length;
-
-  // charts
-  const langPairs = countBy(rows, 'lang').slice(0,12);
-  makeChart('chartLang', langPairs.map(x=>x[0]), langPairs.map(x=>x[1]));
-
-  const regionPairs = countBy(rows, 'region').slice(0,12);
-  makeChart('chartRegion', regionPairs.map(x=>x[0]), regionPairs.map(x=>x[1]));
-
-  const interestPairs = countBy(rows, 'interest').slice(0,12);
-  makeChart('chartInterest', interestPairs.map(x=>x[0]), interestPairs.map(x=>x[1]));
-
-  renderTopPlaces(rows);
-  renderTagCloud(rows);
-}
-
-// =========================
-// PARSERS
-// =========================
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-}
-
-function unifyRow(obj){
-  // Accept various column names; map to canonical keys:
-  // lang, region, interest, place, turn3_text
-  const lang = obj.lang ?? obj.language ?? obj.turn0 ?? obj.turn0_lang ?? obj['Turn0'] ?? obj['Turn0_lang'];
-  const region = obj.region ?? obj.turn1 ?? obj.turn1_region ?? obj['Turn1'] ?? obj['Turn1_region'];
-  const interest = obj.interest ?? obj.turn2 ?? obj.turn2_interest ?? obj['Turn2'] ?? obj['Turn2_interest'];
-  const place = obj.place ?? obj.turn15 ?? obj.turn1_5 ?? obj.turn1_5_place ?? obj['Turn1.5'] ?? obj['Turn1_5'] ?? obj['turn1.5'];
-  const turn3_text = obj.turn3_text ?? obj.turn3 ?? obj.turn3_free ?? obj['Turn3'] ?? obj['Turn3_text'] ?? obj['turn3'];
-
-  return {
-    lang: norm(lang),
-    region: norm(region),
-    interest: norm(interest),
-    place: norm(place),
-    turn3_text: turn3_text===null || turn3_text===undefined ? '' : String(turn3_text)
+  // Scale font sizes
+  const counts = list.map(([w,c])=>c);
+  const max=Math.max(...counts), min=Math.min(...counts);
+  const scale = (c)=>{
+    if(max===min) return 20;
+    return 14 + (c-min) * (34-14) / (max-min);
   };
-}
 
-function parseCSV(text){
-  // simple CSV parser via XLSX for robustness
-  const wb = XLSX.read(text, {type:'string'});
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
-  return json.map(unifyRow);
-}
-
-async function loadAutoCSV(){
-  setStatus('ok', 'CSVを自動読込しています…');
-  try{
-    const res = await fetch(AUTO_CSV_URL, {cache:'no-store'});
-    if(!res.ok) throw new Error(`fetch failed: ${res.status}`);
-    const buf = await res.arrayBuffer();
-    // Use XLSX read for CSV too
-    const wb = XLSX.read(buf, {type:'array'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
-    summaries = json.map(unifyRow);
-
-    lastUpdated = new Date();
-    currentSource = AUTO_CSV_URL;
-
-    setStatus('ok', '自動読込完了');
-    updateUIAfterLoad('AUTO');
-  }catch(e){
-    setStatus('warn', '自動読込に失敗しました。ファイルアップロードで読み込めます。');
-    debug.textContent = `AUTO LOAD ERROR: ${e.message}`;
-    dataMode.textContent = 'AUTO (failed)';
+  for(const [w,c] of list){
+    const div=document.createElement('div');
+    div.className='tag';
+    const size = scale(c);
+    div.innerHTML = `<span class="w" style="font-size:${size}px">${escapeHtml(w)}</span><span class="c">${c}</span>`;
+    tagCloud.appendChild(div);
   }
 }
 
-async function loadFile(file){
-  setStatus('ok', 'ファイルを読み込んでいます…');
-  const ext = (file.name.split('.').pop()||'').toLowerCase();
-  const buf = await file.arrayBuffer();
-
-  let json=[];
-  if(ext==='csv'){
-    const wb = XLSX.read(buf, {type:'array'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    json = XLSX.utils.sheet_to_json(sheet, {defval:''});
-  }else{
-    const wb = XLSX.read(buf, {type:'array'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    json = XLSX.utils.sheet_to_json(sheet, {defval:''});
-  }
-
-  summaries = json.map(unifyRow);
-  lastUpdated = new Date();
-  currentSource = file.name;
-
-  setStatus('ok', 'アップロード読込完了');
-  updateUIAfterLoad('UPLOAD');
+function escapeHtml(s){
+  return String(s)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#039;");
 }
 
-// =========================
-// AFTER LOAD
-// =========================
-function updateUIAfterLoad(mode){
-  dataMode.textContent = mode;
-  dataUpdated.textContent = formatDT(lastUpdated);
-  dataRows.textContent = summaries.length;
-  dataSource.textContent = currentSource;
+function render(rows){
+  hit.textContent = `ヒット: ${rows.length} 件`;
+  renderKpis(rows);
+  renderTagCloud(rows);
+  renderTable(rows);
+}
 
-  // fill filters
+// init select options
+(function init(){
   fillSelect(fLang, uniqNorm(summaries.map(r=>r.lang)));
   fillSelect(fRegion, uniqNorm(summaries.map(r=>r.region)));
   fillSelect(fInterest, uniqNorm(summaries.map(r=>r.interest)));
 
-  applyFilters();
-}
+  btnApply.addEventListener('click', applyFilters);
+  btnReset.addEventListener('click', resetFilters);
 
-// =========================
-// EVENTS
-// =========================
-document.getElementById('btnReset').addEventListener('click', resetFilters);
-document.getElementById('btnReload').addEventListener('click', ()=>loadAutoCSV());
-document.getElementById('btnAuto').addEventListener('click', ()=>loadAutoCSV());
-
-[fLang, fRegion, fInterest].forEach(sel=>sel.addEventListener('change', applyFilters));
-fPlace.addEventListener('input', ()=>{
-  // debounce a bit
-  if(window._t) clearTimeout(window._t);
-  window._t=setTimeout(applyFilters, 150);
-});
-
-document.getElementById('fileInput').addEventListener('change', async (e)=>{
-  const f = e.target.files && e.target.files[0];
-  if(!f) return;
-  try{
-    await loadFile(f);
-  }catch(err){
-    setStatus('warn', 'ファイル読込に失敗しました');
-    debug.textContent = `UPLOAD ERROR: ${err.message}`;
-  }finally{
-    e.target.value='';
-  }
-});
-
-// =========================
-// INIT
-// =========================
-loadAutoCSV();
+  render(summaries);
+})();
 </script>
 </body>
 </html>
