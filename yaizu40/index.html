@@ -3,398 +3,290 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>焼津さかなセンター40周年｜チャットログ分析ダッシュボード</title>
+<title>焼津さかなセンター40周年｜イベント分析ダッシュボード（単体HTML）</title>
+
+<!-- External libs (CDN). If you need fully offline, tell me and I’ll inline/minify later. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
+
 <style>
-:root{
-  --bg:#ffffff; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0; --card:#ffffff;
-  --accent:#2563eb; --accent2:#16a34a; --danger:#ef4444;
-  --shadow: 0 10px 30px rgba(2,6,23,.08);
-  --r:16px;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--fg)}
-header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border)}
-.wrap{max-width:1200px;margin:0 auto;padding:16px}
-h1{margin:0;font-size:18px;line-height:1.2}
-.sub{margin-top:6px;color:var(--muted);font-size:12px}
-.badges{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
-.badge{font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
-main{padding:16px}
-.grid{display:grid;gap:14px;grid-template-columns:1fr}
-@media(min-width:980px){.grid{grid-template-columns:1fr 1fr}}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:14px}
-.card h2{margin:0 0 10px 0;font-size:14px}
-.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-@media(min-width:700px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.kpi{border:1px solid var(--border);border-radius:14px;padding:12px}
-.kpi .label{font-size:12px;color:var(--muted)}
-.kpi .value{margin-top:6px;font-size:22px;font-weight:850;letter-spacing:.2px}
-.kpi .hint{margin-top:6px;font-size:12px;color:var(--muted)}
-.controls{display:grid;grid-template-columns:1fr;gap:10px}
-@media(min-width:980px){.controls{grid-template-columns:1.2fr .8fr}}
-label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-select,input[type="text"]{width:100%;padding:10px;border:1px solid var(--border);border-radius:12px;outline:none}
-select:focus,input:focus{border-color:rgba(37,99,235,.6);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
-.btn{appearance:none;border:1px solid var(--border);background:#fff;color:var(--fg);padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:750}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.muted{color:var(--muted);font-size:12px}
-.barlist{display:flex;flex-direction:column;gap:8px}
-.barrow{display:grid;grid-template-columns:220px 1fr 56px;gap:10px;align-items:center}
-@media(max-width:700px){.barrow{grid-template-columns:140px 1fr 46px}}
-.barlabel{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bar{height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden}
-.bar > span{display:block;height:100%;background:var(--accent);width:0%}
-.barnum{font-family:var(--mono);font-size:12px;text-align:right;color:var(--muted)}
-.tableWrap{overflow:auto;border:1px solid var(--border);border-radius:14px}
-table{border-collapse:collapse;width:100%;min-width:720px;background:#fff}
-th,td{border-bottom:1px solid var(--border);padding:10px;font-size:12px;text-align:left;vertical-align:top}
-th{background:#f8fafc;position:sticky;top:0;z-index:1}
-.tagcloud{line-height:1.35}
-.tag{display:inline-block;margin:4px 6px 0 0;padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:#fff}
-.tag small{color:var(--muted);font-family:var(--mono);margin-left:6px}
-hr{border:none;border-top:1px solid var(--border);margin:12px 0}
-
-.seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:#fff}
-.segbtn{padding:7px 12px;border:0;background:transparent;cursor:pointer;font-weight:800;font-size:12px;color:var(--muted)}
-.segbtn.active{background:var(--accent);color:#fff}
-.segbtn:not(.active):hover{background:#f3f4f6;color:var(--fg)}
-
-.funnel{display:flex;flex-direction:column;gap:10px;margin-top:10px}
-.funnelrow{display:grid;grid-template-columns:180px 1fr 64px 96px;gap:10px;align-items:center}
-@media(max-width:800px){.funnelrow{grid-template-columns:120px 1fr 52px 80px}}
-.funnelstep{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.funnelbar{height:14px;background:#f1f5f9;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
-.funnelbar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#60a5fa)}
-.funnelcount{font-family:var(--mono);font-size:12px;text-align:right}
-.funnelrate{font-family:var(--mono);font-size:12px;text-align:right;color:var(--muted)}
-
-
-/* =========================
-   EMBED (iframe) OPTIMIZATION v4
-   - Remove outer whitespace
-   - Make header compact
-   - Improve readability in constrained widths
-   ========================= */
-html, body{ margin:0; padding:0; }
-body{ background: transparent; }
-
-/* If the original layout has a sticky header, keep it but make it slimmer for embed */
-header{ padding: 10px 12px !important; }
-main{ padding: 12px !important; }
-.wrap{ max-width: 1100px !important; }
-
-/* Cards slightly tighter */
-.card{ padding: 12px !important; }
-.grid{ gap: 12px !important; }
-.kpi{ padding: 10px !important; }
-.kpi .value{ font-size: 18px !important; }
-
-/* Make long tables more usable in iframe */
-.tableWrap{ max-height: 520px; }
-
-/* Reduce chart heights a bit for embed */
-.chartBox{ height: 300px !important; }
-@media (max-width: 650px){
-  .chartBox{ height: 260px !important; }
-  header{ position: static !important; } /* avoid sticky header consuming space in embed on small screens */
-}
-
+  :root{
+    --bg:#ffffff; --fg:#111111; --muted:#6b7280; --card:#ffffff; --border:#e5e7eb;
+    --blue:#2563eb; --blue2:#1d4ed8; --green:#10b981; --amber:#f59e0b; --red:#ef4444;
+    --shadow: 0 12px 30px rgba(0,0,0,.08);
+    --radius: 18px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;
+    background:var(--bg); color:var(--fg);
+  }
+  header{
+    position:sticky; top:0; z-index:10;
+    background:rgba(255,255,255,.92); backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .wrap{max-width:1200px; margin:0 auto; padding:18px 16px;}
+  .title{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+  }
+  .title h1{margin:0; font-size:20px; letter-spacing:.2px;}
+  .title .sub{color:var(--muted); font-size:12px;}
+  .grid{
+    display:grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap:16px;
+    padding:16px;
+    max-width:1200px;
+    margin:0 auto;
+  }
+  @media (max-width: 980px){
+    .grid{grid-template-columns:1fr}
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow: var(--shadow);
+    padding:16px;
+  }
+  .card h2{
+    margin:0 0 8px 0;
+    font-size:16px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .muted{color:var(--muted)}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .pill{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 10px; border-radius:999px;
+    border:1px solid var(--border);
+    background:#fff;
+    font-size:12px;
+  }
+  .btn{
+    border:1px solid var(--border);
+    background:#fff;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .btn:hover{border-color:#cbd5e1}
+  .btn.primary{
+    background: linear-gradient(180deg, #2563eb, #1d4ed8);
+    border-color:#1d4ed8;
+    color:#fff;
+  }
+  .btn.primary:hover{filter:brightness(1.03)}
+  .kpis{
+    display:grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap:10px;
+    margin-top:10px;
+  }
+  @media (max-width: 980px){
+    .kpis{grid-template-columns: repeat(2, minmax(0,1fr))}
+  }
+  .kpi{
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:12px 12px;
+    background:#fff;
+  }
+  .kpi .lab{font-size:12px; color:var(--muted); margin-bottom:6px}
+  .kpi .val{font-size:20px; font-weight:800}
+  .kpi .hint{font-size:12px; color:var(--muted); margin-top:6px}
+  .filters{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:10px;
+    margin-top:10px;
+  }
+  @media (max-width: 640px){
+    .filters{grid-template-columns:1fr}
+  }
+  .field label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px 2px}
+  select, input[type="text"]{
+    width:100%;
+    padding:10px 10px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    outline:none;
+    background:#fff;
+  }
+  select:focus, input[type="text"]:focus{border-color:#93c5fd; box-shadow:0 0 0 4px rgba(59,130,246,.12)}
+  .charts{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:10px;
+    margin-top:10px;
+  }
+  @media (max-width: 980px){
+    .charts{grid-template-columns:1fr}
+  }
+  canvas{max-width:100%}
+  .small{font-size:12px}
+  .hr{height:1px; background:var(--border); margin:12px 0}
+  .tagCloud{
+    display:flex; flex-wrap:wrap; gap:8px;
+    padding:8px 2px 2px 2px;
+  }
+  .tag{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 10px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:#fff;
+    white-space:nowrap;
+  }
+  .tag b{font-weight:900}
+  .tag span{color:var(--muted); font-weight:700}
+  .note{
+    margin:8px 0 0 0;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.5;
+  }
+  .warn{
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#7c2d12;
+    padding:10px 12px;
+    border-radius:14px;
+    font-size:12px;
+  }
+  .ok{
+    background:#ecfdf5;
+    border:1px solid #a7f3d0;
+    color:#065f46;
+    padding:10px 12px;
+    border-radius:14px;
+    font-size:12px;
+  }
+  .rightBox{
+    display:grid; gap:16px;
+  }
+  .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas, "Liberation Mono","Courier New",monospace}
 </style>
 </head>
 <body>
 
-<!--
-=========================================================
-PARENT PAGE SNIPPET (place in the page that contains iframe)
-=========================================================
-<script>
-window.addEventListener('message', function(e){
-  if(e.data && e.data.type === 'iframe-height'){
-    var iframe = document.getElementById('yaizuDashboard');
-    if(iframe){
-      iframe.style.height = e.data.height + 'px';
-    }
-  }
-});
-</script>
-
-<iframe id="yaizuDashboard"
-  src="(this page URL)"
-  width="100%"
-  style="border:none;height:900px;"
-  loading="lazy"
-  referrerpolicy="no-referrer"
-></iframe>
-=========================================================
--->
-
 <header>
   <div class="wrap">
-    <h1>焼津さかなセンター40周年｜チャットログ分析ダッシュボード</h1>
-    <div class="sub">本ページはイベント当日の対話ログを集計し、来場者傾向を可視化したものです。。</div>
-    <div class="badges">
-      <span class="badge" id="metaUU"></span>
-      <span class="badge" id="metaGen"></span>
-      <span class="badge" id="metaSrc"></span>
+    <div class="title">
+      <div>
+        <h1>焼津さかなセンター40周年｜イベント分析ダッシュボード</h1>
+        <div class="sub">単体HTML / CSV自動読込（またはアップロード） / Turnデータ可視化</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnReload">再読込</button>
+        <button class="btn primary" id="btnReset">フィルタ解除</button>
+      </div>
     </div>
+
+    <div class="kpis" id="kpis">
+      <div class="kpi"><div class="lab">総セッション数（行数）</div><div class="val" id="kpiSessions">-</div><div class="hint">フィルタ後</div></div>
+      <div class="kpi"><div class="lab">Turn0（言語）</div><div class="val" id="kpiLangs">-</div><div class="hint">ユニーク数</div></div>
+      <div class="kpi"><div class="lab">Turn1（地域）</div><div class="val" id="kpiRegions">-</div><div class="hint">ユニーク数</div></div>
+      <div class="kpi"><div class="lab">Turn2（興味）</div><div class="val" id="kpiInterests">-</div><div class="hint">ユニーク数</div></div>
+    </div>
+
+    <div class="filters">
+      <div class="field">
+        <label>言語（Turn0）</label>
+        <select id="fLang" multiple size="4"></select>
+      </div>
+      <div class="field">
+        <label>地域（Turn1）</label>
+        <select id="fRegion" multiple size="4"></select>
+      </div>
+      <div class="field">
+        <label>興味（Turn2）</label>
+        <select id="fInterest" multiple size="4"></select>
+      </div>
+      <div class="field">
+        <label>自由入力（Turn1.5 / 例: 浜松 / 台北 / Indonesia）</label>
+        <input id="fPlace" type="text" placeholder="キーワードで絞り込み（部分一致）">
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <div class="pill">データ: <b id="dataMode">-</b></div>
+      <div class="pill">最終更新: <b id="dataUpdated">-</b></div>
+      <div class="pill">行数: <b id="dataRows">-</b></div>
+      <div class="pill mono">source: <span id="dataSource">-</span></div>
+    </div>
+
   </div>
 </header>
 
-<main>
-<div class="wrap">
-
-  <div class="card">
-    <h2>KPI</h2>
-    <div class="kpis">
-      <div class="kpi">
-        <div class="label">UU（会話数）</div>
-        <div class="value" id="kUU">-</div>
-        <div class="hint">conversation_id のユニーク数</div>
+<main class="grid">
+  <section class="card">
+    <h2>📊 集計</h2>
+    <div class="charts">
+      <div class="card" style="box-shadow:none">
+        <h2 style="margin:0 0 8px 0; font-size:14px">言語（Turn0）</h2>
+        <canvas id="chartLang"></canvas>
       </div>
-      <div class="kpi">
-        <div class="label">Turn1 選択率</div>
-        <div class="value" id="kT1">-</div>
-        <div class="hint">来場圏域が取れた割合</div>
+      <div class="card" style="box-shadow:none">
+        <h2 style="margin:0 0 8px 0; font-size:14px">興味（Turn2）</h2>
+        <canvas id="chartInterest"></canvas>
       </div>
-      <div class="kpi">
-        <div class="label">Turn1.5 入力率</div>
-        <div class="value" id="kT15">-</div>
-        <div class="hint">来場地が取れた割合</div>
+      <div class="card" style="box-shadow:none">
+        <h2 style="margin:0 0 8px 0; font-size:14px">地域（Turn1）</h2>
+        <canvas id="chartRegion"></canvas>
       </div>
-      <div class="kpi">
-        <div class="label">Turn2 選択率</div>
-        <div class="value" id="kT2">-</div>
-        <div class="hint">興味関心が取れた割合</div>
+      <div class="card" style="box-shadow:none">
+        <h2 style="margin:0 0 8px 0; font-size:14px">自由入力（Turn1.5）上位</h2>
+        <div class="small muted">※ 正規化して集計（空は (unknown)）</div>
+        <div id="topPlaces" class="small" style="margin-top:8px"></div>
       </div>
     </div>
-    <div class="muted" style="margin-top:10px;">※ Turn3の自由入力率：<b id="kT3">-</b></div>
-  </div>
 
+    <div class="hr"></div>
 
-  <div class="card">
-    <h2>Turn到達ファネル</h2>
-    <div class="muted">※ 現在のフィルタ条件に対して算出（Start → Turn1 → Turn1.5 → Turn2 → Turn3）</div>
-    
-    <div class="row" style="justify-content:flex-end; margin-top:8px;">
-      <div class="seg" role="group" aria-label="Funnel display mode">
-        <button class="segbtn active" type="button" data-mode="overall">overallだけ</button>
-        <button class="segbtn" type="button" data-mode="step">stepだけ</button>
+    <div class="row">
+      <div class="warn" style="flex:1">
+        <b>ヒント：</b>複数選択（Shift/Ctrl）でフィルタを組み合わせられます。入力欄は部分一致です。
       </div>
     </div>
-    <div id="funnel" class="funnel"></div>
-  </div>
+  </section>
 
+  <aside class="rightBox">
+    <section class="card">
+      <h2>🧠 ワードクラウド（Turn3自由入力の頻出語）</h2>
+      <p class="note">※ 助詞・接続詞など意味が薄い語は除外し、名詞に寄せた頻出語を表示します（ブラウザ内での簡易推定／環境依存を避けるため、完全な形態素解析は行いません）。</p>
+      <div id="tagCloud" class="tagCloud"></div>
+    </section>
 
-  <div class="card">
-    <h2>フィルタ（結果共有でも操作可）</h2>
-    <div class="controls">
+    <section class="card">
+      <h2>📥 データ読み込み</h2>
+      <div class="small muted">基本は自動読込。うまくいかない場合はアップロードでもOK。</div>
+      <div class="hr"></div>
+
       <div class="row">
-        <div style="flex:1;min-width:200px;">
-          <label>言語（Turn0）</label>
-          <select id="fLang" multiple size="5"></select>
-        </div>
-        <div style="flex:1;min-width:220px;">
-          <label>来場圏域（Turn1）</label>
-          <select id="fRegion" multiple size="5"></select>
-        </div>
-        <div style="flex:1;min-width:240px;">
-          <label>興味関心（Turn2）</label>
-          <select id="fInterest" multiple size="5"></select>
-        </div>
-        <div style="flex:1;min-width:260px;">
-          <label>来場地（Turn1.5）部分一致</label>
-          <input id="fPlace" type="text" placeholder="例：静岡 / 愛知 / Tokyo / Korea など"/>
-          <div class="muted" style="margin-top:6px;">※ 空欄なら全件</div>
-        </div>
+        <button class="btn" id="btnAuto">自動読込（CSV）</button>
+        <label class="btn" style="cursor:pointer">
+          ファイルを選択（CSV / XLSX）
+          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none">
+        </label>
       </div>
-      <div class="row" style="justify-content:flex-end;">
-        <button class="btn primary" id="applyBtn">適用</button>
-        <button class="btn" id="resetBtn">リセット</button>
-        <button class="btn" id="dlSummaryBtn">要約CSVをDL</button>
-        <button class="btn" id="dlSankeyBtn">Sankey用CSVをDL</button>
-      </div>
-    </div>
-  </div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>✅ 来場圏域（Turn1）</h2>
-      <div class="barlist" id="regionBars"></div>
-    </div>
-
-    <div class="card">
-      <h2>✅ 来場地ランキング（Turn1.5）</h2>
-      <div class="barlist" id="placeBars"></div>
-      <div class="muted" style="margin-top:8px;">※ 上位20件（フィルタ反映）</div>
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <h2>✅ クロス分析（来場圏域 × 興味関心）</h2>
-      <div class="tableWrap">
-        <table>
-          <thead><tr id="crossHead"></tr></thead>
-          <tbody id="crossBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>✅ ワードクラウド（Turn3自由入力の頻出語）</h2>
-      <div class="muted">※ 絵としての雲ではなく、頻度に応じて文字サイズを変えたタグクラウドです（環境依存を避けるため）。</div>
-      <hr/>
-      <div class="tagcloud" id="tagCloud"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>✅ Sankey用データ（言語 → 圏域 → 興味）</h2>
-    <div class="muted">※ 表示そのものは軽量化のためテーブル形式。必要ならDLしたCSVをSankey描画ツールに投入できます。</div>
-    <div class="tableWrap" style="margin-top:10px;">
-      <table>
-        <thead><tr><th>source</th><th>target</th><th>value</th><th>stage</th></tr></thead>
-        <tbody id="sankeyBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>要約テーブル（会話単位）</h2>
-    <div class="muted">※ 最大200行表示（フィルタ反映）。</div>
-    <div class="tableWrap" style="margin-top:10px;">
-      <table>
-        <thead>
-          <tr>
-            <th>conversation_id</th>
-            <th>lang</th>
-            <th>region</th>
-            <th>place</th>
-            <th>interest</th>
-            <th>turn3_text (first)</th>
-            <th>started_at</th>
-          </tr>
-        </thead>
-        <tbody id="summaryBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
+      <div class="hr"></div>
+      <div id="loadStatus" class="ok">準備完了</div>
+      <div class="note mono" id="debug"></div>
+    </section>
+  </aside>
 </main>
 
-<script id="DATA" type="application/json">{"agg": {"uu": 205, "by_lang": {"Japanese": 183, "(unknown)": 21, "English": 1}, "by_region": {"県内（焼津市外）": 74, "焼津市内・近く": 60, "県外から": 44, "(unknown)": 25, "海外から": 2}, "by_interest": {"美味しく食べる・カフェなど": 82, "(unknown)": 70, "焼津市内の観光": 20, "お土産選びから": 18, "温泉・港・ミュージアム": 15}, "place_top": [{"place": "静岡市", "count": 22}, {"place": "島田市", "count": 11}, {"place": "焼津市", "count": 8}, {"place": "藤枝市", "count": 7}, {"place": "愛知県", "count": 6}, {"place": "藤枝", "count": 6}, {"place": "焼津", "count": 6}, {"place": "東京", "count": 5}, {"place": "三ケ名", "count": 4}, {"place": "浜松市", "count": 4}, {"place": "神奈川", "count": 4}, {"place": "長野県", "count": 3}, {"place": "静岡市駿河区", "count": 3}, {"place": "磐田市", "count": 3}, {"place": "近所", "count": 3}, {"place": "富士市", "count": 3}, {"place": "富士宮", "count": 2}, {"place": "南マグロ丼", "count": 2}, {"place": "牧之原市", "count": 2}, {"place": "小田原", "count": 2}, {"place": "愛知", "count": 2}, {"place": "山梨県", "count": 2}, {"place": "滋賀県", "count": 2}, {"place": "群馬県", "count": 2}, {"place": "瀬戸市", "count": 2}, {"place": "西焼津", "count": 2}, {"place": "島田", "count": 2}, {"place": "静岡市葵区", "count": 2}, {"place": "愛知県瀬戸市", "count": 2}, {"place": "神奈川県", "count": 2}, {"place": "駿河区", "count": 1}, {"place": "マグロのおすすめは?", "count": 1}, {"place": "品川区", "count": 1}, {"place": "アンドロメダ", "count": 1}, {"place": "一色", "count": 1}, {"place": "富士宮市", "count": 1}, {"place": "大井川", "count": 1}, {"place": "静岡県湖西市鷲津", "count": 1}, {"place": "兵庫県", "count": 1}, {"place": "鮪が美味しい店は？", "count": 1}, {"place": "三右衛門新田", "count": 1}, {"place": "相模原市", "count": 1}, {"place": "焼津市石津", "count": 1}, {"place": "静岡市清水区", "count": 1}, {"place": "マグロ", "count": 1}, {"place": "生牡蠣がたべたいです", "count": 1}, {"place": "御殿場", "count": 1}, {"place": "東京都杉並区", "count": 1}, {"place": "横浜市", "count": 1}, {"place": "イチゴ狩り", "count": 1}], "cross": {"rows": ["(unknown)", "海外から", "焼津市内・近く", "県内（焼津市外）", "県外から"], "cols": ["(unknown)", "お土産選びから", "温泉・港・ミュージアム", "焼津市内の観光", "美味しく食べる・カフェなど"], "matrix": [[13, 1, 2, 0, 9], [1, 0, 0, 0, 1], [24, 5, 3, 3, 25], [18, 11, 4, 7, 34], [14, 1, 6, 10, 13]]}, "sankey_links": [{"source": "Japanese", "target": "県内（焼津市外）", "value": 68, "stage": 1}, {"source": "Japanese", "target": "焼津市内・近く", "value": 52, "stage": 1}, {"source": "Japanese", "target": "県外から", "value": 41, "stage": 1}, {"source": "県内（焼津市外）", "target": "美味しく食べる・カフェなど", "value": 34, "stage": 2}, {"source": "焼津市内・近く", "target": "美味しく食べる・カフェなど", "value": 25, "stage": 2}, {"source": "県外から", "target": "美味しく食べる・カフェなど", "value": 13, "stage": 2}, {"source": "県内（焼津市外）", "target": "お土産選びから", "value": 11, "stage": 2}, {"source": "県外から", "target": "焼津市内の観光", "value": 10, "stage": 2}, {"source": "県内（焼津市外）", "target": "焼津市内の観光", "value": 7, "stage": 2}, {"source": "県外から", "target": "温泉・港・ミュージアム", "value": 6, "stage": 2}, {"source": "焼津市内・近く", "target": "お土産選びから", "value": 5, "stage": 2}, {"source": "県内（焼津市外）", "target": "温泉・港・ミュージアム", "value": 4, "stage": 2}, {"source": "焼津市内・近く", "target": "温泉・港・ミュージアム", "value": 3, "stage": 2}, {"source": "焼津市内・近く", "target": "焼津市内の観光", "value": 3, "stage": 2}, {"source": "English", "target": "海外から", "value": 1, "stage": 1}, {"source": "Japanese", "target": "海外から", "value": 1, "stage": 1}, {"source": "海外から", "target": "美味しく食べる・カフェなど", "value": 1, "stage": 2}, {"source": "県外から", "target": "お土産選びから", "value": 1, "stage": 2}], "word_freq": [{"word": "おす", "count": 20}, {"word": "すす", "count": 20}, {"word": "すめ", "count": 20}, {"word": "えて", "count": 17}, {"word": "めの", "count": 16}, {"word": "海鮮", "count": 16}, {"word": "教え", "count": 13}, {"word": "鮮丼", "count": 13}, {"word": "しい", "count": 11}, {"word": "の海", "count": 10}, {"word": "美味", "count": 9}, {"word": "味し", "count": 9}, {"word": "を教", "count": 5}, {"word": "マグロ", "count": 5}, {"word": "海鮮丼", "count": 5}, {"word": "マグ", "count": 4}, {"word": "グロ", "count": 4}, {"word": "ロ丼", "count": 4}, {"word": "の魚", "count": 4}, {"word": "です", "count": 4}, {"word": "おし", "count": 4}, {"word": "しえ", "count": 4}, {"word": "焼津", "count": 4}, {"word": "い海", "count": 4}, {"word": "まぐろ", "count": 3}, {"word": "はん", "count": 3}, {"word": "いお", "count": 3}, {"word": "お店", "count": 3}, {"word": "丼を", "count": 3}, {"word": "楽し", "count": 3}, {"word": "の店", "count": 2}, {"word": "いち", "count": 2}, {"word": "ちご", "count": 2}, {"word": "たべ", "count": 2}, {"word": "って", "count": 2}, {"word": "ある", "count": 2}, {"word": "丼教", "count": 2}, {"word": "お魚", "count": 2}, {"word": "魚教", "count": 2}, {"word": "丼お", "count": 2}, {"word": "セン", "count": 2}, {"word": "ンタ", "count": 2}, {"word": "ター", "count": 2}, {"word": "のお", "count": 2}, {"word": "こん", "count": 2}, {"word": "んに", "count": 2}, {"word": "にち", "count": 2}, {"word": "ちは", "count": 2}, {"word": "はあ", "count": 2}, {"word": "りま", "count": 2}, {"word": "ます", "count": 2}, {"word": "すか", "count": 2}, {"word": "サー", "count": 2}, {"word": "ーモ", "count": 2}, {"word": "モン", "count": 2}, {"word": "たい", "count": 2}, {"word": "旬の", "count": 2}, {"word": "魚は", "count": 2}, {"word": "津神", "count": 2}, {"word": "神社", "count": 2}, {"word": "える", "count": 2}, {"word": "ると", "count": 2}, {"word": "とこ", "count": 2}, {"word": "ころ", "count": 2}, {"word": "オス", "count": 2}, {"word": "スス", "count": 2}, {"word": "スメ", "count": 2}, {"word": "丼の", "count": 2}], "meta": {"generated_at_jst": "2026-02-22 12:16:43", "source_file": "chat_from_json_v15style_YAIZU_SAKANA_EVENT_2026-02-21_JST (1).xlsx"}, "completion": {"turn1_region_rate": 0.8780487804878049, "turn15_place_rate": 0.8780487804878049, "turn2_interest_rate": 0.6585365853658537, "turn3_text_rate": 0.4195121951219512}, "completion_pct": {"turn1_region_rate": 87.8, "turn15_place_rate": 87.8, "turn2_interest_rate": 65.9, "turn3_text_rate": 42.0}, "samples": {"turn3_examples": ["マグロ丼", "まぐろ、", "かいはん", "まぐろ", "おすすめの魚", "おすすめの店教えて", "いちごそふとたべた！", "マグロっ！！", "さくら", "おすすめ", "マグロ丼", "おすすめの海鮮丼"]}}, "summaries": [{"conversation_id": "003a124b-aa31-459a-986f-85a75a67a14f", "started_at": "2026-02-21 13:59:47", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "00f53785-550c-4a62-bcd3-882324035c9f", "started_at": "2026-02-21 11:45:27", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "03d47e10-7332-4196-8f4a-db817e9c2967", "started_at": "2026-02-21 10:28:49", "lang": "Japanese", "region": "県外から", "place": "東京", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ丼"}, {"conversation_id": "03e21b77-48c5-4b09-b308-89027042f7d3", "started_at": "2026-02-21 09:31:09", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "077c9354-c6ae-4bc3-9b0f-6466bad9bf15", "started_at": "2026-02-21 11:45:34", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "078fddc3-6034-4e53-a6de-7f72c2471fd6", "started_at": "2026-02-21 11:05:50", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "0971f660-3396-48fc-8b72-ce6901dbe23c", "started_at": "2026-02-21 10:22:50", "lang": "Japanese", "region": "焼津市内・近く", "place": "お勧めスポットを教えて", "interest": null, "turn3_text": null}, {"conversation_id": "09905009-1bfa-4e6c-bccb-507c909ec8a6", "started_at": "2026-02-21 15:23:36", "lang": "Japanese", "region": "県外から", "place": "長野市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "09b73eab-14c3-453a-bb90-84b756da815e", "started_at": "2026-02-21 11:47:05", "lang": "Japanese", "region": "焼津市内・近く", "place": "愛知県瀬戸市", "interest": null, "turn3_text": null}, {"conversation_id": "09cbc0ae-a351-4c77-9d2e-66b6d7a8d61a", "started_at": "2026-02-21 10:00:48", "lang": "Japanese", "region": "県内（焼津市外）", "place": "富士市", "interest": "美味しく食べる・カフェなど", "turn3_text": "まぐろ、"}, {"conversation_id": "0bd93b51-5d81-4584-b0ab-aa35df0531f2", "started_at": "2026-02-21 11:29:51", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝", "interest": "美味しく食べる・カフェなど", "turn3_text": "かいはん"}, {"conversation_id": "0d03b5a6-8fdc-4a51-bc0e-93c71507698c", "started_at": "2026-02-21 11:03:57", "lang": "Japanese", "region": "焼津市内・近く", "place": "清水区西久保", "interest": "美味しく食べる・カフェなど", "turn3_text": "まぐろ"}, {"conversation_id": "0d38a849-78a6-4f9a-9cab-a1324a1dbed0", "started_at": "2026-02-21 13:01:30", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの魚"}, {"conversation_id": "0d7eb8b8-8b9e-4ea8-b50c-5bd695e64d57", "started_at": "2026-02-21 12:05:48", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "0dcea8a3-8998-4e72-8bfd-ee7a159d551f", "started_at": "2026-02-21 14:34:15", "lang": "Japanese", "region": "焼津市内・近く", "place": "藤枝市", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの店教えて"}, {"conversation_id": "0f950700-632a-413f-9048-1f9d45ea4c34", "started_at": "2026-02-21 12:04:52", "lang": "Japanese", "region": "県外から", "place": "愛知県", "interest": "美味しく食べる・カフェなど", "turn3_text": "いちごそふとたべた！"}, {"conversation_id": "0fd0717f-f85e-47a6-9b9e-554ce844fa3d", "started_at": "2026-02-21 10:55:53", "lang": null, "region": "焼津市内・近く", "place": "西焼津", "interest": null, "turn3_text": null}, {"conversation_id": "12994b74-f0cf-4615-97a2-2895beaf5b67", "started_at": "2026-02-21 09:46:04", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": null, "turn3_text": null}, {"conversation_id": "149f265a-3406-40cd-9793-11498bbfa886", "started_at": "2026-02-21 13:50:39", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "お土産選びから", "turn3_text": "マグロっ！！"}, {"conversation_id": "152ad14b-08ac-40b7-9c48-3224446670b4", "started_at": "2026-02-21 12:04:02", "lang": "Japanese", "region": "県外から", "place": "瀬戸市", "interest": null, "turn3_text": null}, {"conversation_id": "15d3d1b6-d267-4ed8-a63f-196394d7384f", "started_at": "2026-02-21 10:14:11", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝市", "interest": "焼津市内の観光", "turn3_text": "さくら"}, {"conversation_id": "16686b33-2834-42c8-87ac-431e724f693a", "started_at": "2026-02-21 10:00:56", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "1f3db849-245b-495f-9f22-d0b1ac640db6", "started_at": "2026-02-21 10:48:42", "lang": null, "region": "県内（焼津市外）", "place": "浜松", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめ"}, {"conversation_id": "215de451-ce2d-490b-816b-21bcd2aec10b", "started_at": "2026-02-21 10:24:04", "lang": "Japanese", "region": "焼津市内・近く", "place": "藤枝市", "interest": "お土産選びから", "turn3_text": null}, {"conversation_id": "22460027-9294-4d02-b609-0aa17a6cb54a", "started_at": "2026-02-21 13:18:04", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "261d484a-f658-4a67-94a4-01f8416cc0e2", "started_at": "2026-02-21 11:04:11", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ丼"}, {"conversation_id": "26814a0f-49c7-4451-9e28-cead73c472b6", "started_at": "2026-02-21 10:57:26", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼"}, {"conversation_id": "27ec3fad-e0ab-4c3f-b999-e01c4c4000ee", "started_at": "2026-02-21 13:11:31", "lang": "Japanese", "region": "焼津市内・近く", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "299a8a8b-321e-4729-bbe3-4f74ea8f534a", "started_at": "2026-02-21 09:22:12", "lang": "Japanese", "region": "県外から", "place": "神奈川", "interest": null, "turn3_text": null}, {"conversation_id": "2b609eec-346a-4a6f-b658-71cbc66377fe", "started_at": "2026-02-21 10:44:17", "lang": "Japanese", "region": "県外から", "place": "滋賀県", "interest": "焼津市内の観光", "turn3_text": null}, {"conversation_id": "2dd09fdf-5668-4fea-97e3-b3c7f32ca7bd", "started_at": "2026-02-21 10:19:34", "lang": "Japanese", "region": "県外から", "place": "東京都", "interest": "焼津市内の観光", "turn3_text": "小川で有名な食堂ってどこだっけ？"}, {"conversation_id": "2f1b18be-476b-404b-ac5f-7c420edb5711", "started_at": "2026-02-21 10:12:51", "lang": "Japanese", "region": "県内（焼津市外）", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "2f8c51ca-a34a-41c9-89e6-efba7c9fdfb4", "started_at": "2026-02-21 12:19:31", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "32c5ef4f-7b1c-4dfe-ab95-8945f74f6421", "started_at": "2026-02-21 12:34:42", "lang": "Japanese", "region": "県内（焼津市外）", "place": "愛知", "interest": null, "turn3_text": null}, {"conversation_id": "33a15046-1abc-48bc-8bda-9a0d4827dc71", "started_at": "2026-02-21 10:45:04", "lang": "Japanese", "region": "県内（焼津市外）", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "33b52300-7680-45c0-bc93-37d1d6571358", "started_at": "2026-02-21 13:10:59", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼"}, {"conversation_id": "3604ea29-2a6b-496c-956c-977b4ab16f1f", "started_at": "2026-02-21 14:18:12", "lang": "Japanese", "region": "県外から", "place": "静岡駅", "interest": null, "turn3_text": null}, {"conversation_id": "36341048-b635-4ac4-8051-e8c687d5a91b", "started_at": "2026-02-21 12:10:06", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市駅北", "interest": "美味しく食べる・カフェなど", "turn3_text": "昼ごはん"}, {"conversation_id": "3872c6e1-36a3-49ba-a901-b58f3a47dcb3", "started_at": "2026-02-21 10:41:02", "lang": null, "region": "焼津市内・近く", "place": "この辺り", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "38e15a49-d7c1-4167-a411-bb43ab9448e5", "started_at": "2026-02-21 11:29:47", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市駿河区", "interest": "お土産選びから", "turn3_text": null}, {"conversation_id": "39db2517-6de9-46a2-87d0-cbf803ba3ca0", "started_at": "2026-02-21 10:22:59", "lang": "Japanese", "region": "県外から", "place": "愛知県", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "39f28a58-584a-4eff-8a0c-384892c04ad5", "started_at": "2026-02-21 09:39:48", "lang": "Japanese", "region": "県外から", "place": "神奈川", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "3c223d55-5451-4981-91da-b3810dbd3716", "started_at": "2026-02-21 10:38:34", "lang": "Japanese", "region": null, "place": "南マグロ丼", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "3c5f0789-bfff-4769-a2b8-c433f7b7a077", "started_at": "2026-02-21 09:18:45", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "3cf6eeae-b943-4e03-947a-c4c0225d3496", "started_at": "2026-02-21 09:32:45", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津駅", "interest": null, "turn3_text": null}, {"conversation_id": "3f07e667-5a24-443e-9b05-fddab7cc8f59", "started_at": "2026-02-21 10:11:49", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市駿河区", "interest": "美味しく食べる・カフェなど", "turn3_text": "黒はんぺんのアウトレットってあるらしいのですが？"}, {"conversation_id": "3f854df4-1aa6-4923-8ff1-026334e3a0a0", "started_at": "2026-02-21 12:44:15", "lang": "Japanese", "region": "焼津市内・近く", "place": "近所", "interest": null, "turn3_text": null}, {"conversation_id": "41734df9-7b1a-4282-9491-38c2537a318e", "started_at": "2026-02-21 10:44:01", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田駅", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "44aa888e-0dd1-419a-8f5f-8222510b7d48", "started_at": "2026-02-21 09:29:57", "lang": "Japanese", "region": "県外から", "place": "愛知県", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼教えて"}, {"conversation_id": "4d8fd7ee-6b96-40bf-9846-8186bd719d0d", "started_at": "2026-02-21 11:38:31", "lang": "Japanese", "region": "焼津市内・近く", "place": "さかなせんたー", "interest": null, "turn3_text": null}, {"conversation_id": "4f7329bc-73b7-4ee5-95f1-f2fd1f0edd1d", "started_at": "2026-02-21 10:02:53", "lang": null, "region": null, "place": "まぐろ", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "4f9fb29d-315f-485b-bcac-9f6abfae388c", "started_at": "2026-02-21 09:30:16", "lang": "Japanese", "region": null, "place": "神奈川", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "51708512-51d3-43bf-aeab-03cff61730e8", "started_at": "2026-02-21 09:54:50", "lang": "Japanese", "region": "県内（焼津市外）", "place": "吉田町", "interest": "焼津市内の観光", "turn3_text": null}, {"conversation_id": "51ad6d35-a886-4a88-a298-4c478becfe79", "started_at": "2026-02-21 13:15:43", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "51d3f08e-ddfe-4b72-81c1-a74295ca672b", "started_at": "2026-02-21 14:19:29", "lang": null, "region": "県外から", "place": "埼玉県", "interest": null, "turn3_text": null}, {"conversation_id": "52e34578-fe07-4b98-b1e6-2c8c72b0966d", "started_at": "2026-02-21 10:14:47", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "焼津市内の観光", "turn3_text": null}, {"conversation_id": "52f8ebaf-5fdb-43df-b59a-147e59adbdf2", "started_at": "2026-02-21 13:09:39", "lang": "Japanese", "region": "焼津市内・近く", "place": "豊田", "interest": null, "turn3_text": null}, {"conversation_id": "53b95675-6e62-4b18-b551-73df63043807", "started_at": "2026-02-21 11:58:40", "lang": "Japanese", "region": "県内（焼津市外）", "place": "富士市", "interest": "焼津市内の観光", "turn3_text": null}, {"conversation_id": "54dd415b-2ee0-4b97-a82d-c79a53f5ec17", "started_at": "2026-02-21 09:50:47", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しいお魚教えて"}, {"conversation_id": "55a001d4-e0c6-4003-8944-16ef6ef4ae6b", "started_at": "2026-02-21 12:49:17", "lang": "Japanese", "region": "焼津市内・近く", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "55a6d4da-a0e8-45ac-be68-7e911b315e31", "started_at": "2026-02-21 12:19:19", "lang": "Japanese", "region": "県内（焼津市外）", "place": "牧之原市", "interest": null, "turn3_text": null}, {"conversation_id": "5664d980-8300-47d9-b1a0-94b09c520303", "started_at": "2026-02-21 10:52:06", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津", "interest": "美味しく食べる・カフェなど", "turn3_text": "ねぎトロ丼"}, {"conversation_id": "59b1d5bd-6686-461d-9389-c8e0a90113f6", "started_at": "2026-02-21 10:20:24", "lang": "Japanese", "region": null, "place": "おいしいたべもの", "interest": "お土産選びから", "turn3_text": null}, {"conversation_id": "5c788ee6-0473-4ec8-ad12-8bb98c9d7955", "started_at": "2026-02-21 10:37:25", "lang": "Japanese", "region": null, "place": "南マグロ丼", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "5e403a26-8c48-4327-8e5f-b420df2fc01f", "started_at": "2026-02-21 10:06:42", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "60b2e1c1-8653-4bb5-bdfd-a6edf7f9b697", "started_at": "2026-02-21 11:58:30", "lang": "Japanese", "region": "県外から", "place": "神奈川県", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "62167f76-06f9-4917-bef0-92567ff27b65", "started_at": "2026-02-21 09:46:51", "lang": "Japanese", "region": "焼津市内・近く", "place": "五ケ堀之内", "interest": "美味しく食べる・カフェなど", "turn3_text": "おいしお店"}, {"conversation_id": "6399fa4d-622a-4545-a81c-a5dee08f5236", "started_at": "2026-02-21 10:02:09", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼おしえて"}, {"conversation_id": "6531b10b-7f39-4dfc-be0e-9f1159da02e0", "started_at": "2026-02-21 13:27:54", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝", "interest": "焼津市内の観光", "turn3_text": "焼津魚センター"}, {"conversation_id": "66ad3a63-d948-4c63-8360-b8244263d315", "started_at": "2026-02-21 11:35:41", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝市", "interest": "お土産選びから", "turn3_text": "おすすめのお店は？"}, {"conversation_id": "66d512c8-4a7e-4ae7-90b5-af74af41364a", "started_at": "2026-02-21 10:57:27", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼を教えて"}, {"conversation_id": "67259166-4c3d-46b5-9cb1-69cb93f6516a", "started_at": "2026-02-21 13:27:39", "lang": "Japanese", "region": "焼津市内・近く", "place": "藤枝市", "interest": "美味しく食べる・カフェなど", "turn3_text": "寿司屋"}, {"conversation_id": "67abbcf5-0803-4960-9065-abba7521a98f", "started_at": "2026-02-21 14:01:30", "lang": "Japanese", "region": "焼津市内・近く", "place": "三ケ名", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "69656bce-1a71-4e2e-b8c2-310161dd9101", "started_at": "2026-02-21 11:29:18", "lang": "Japanese", "region": "焼津市内・近く", "place": "三ケ名", "interest": null, "turn3_text": null}, {"conversation_id": "6b5a3e17-e072-4d8a-8abd-db4e322082b8", "started_at": "2026-02-21 09:35:57", "lang": null, "region": null, "place": null, "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "6b746ffe-2b64-4ac2-aadf-c638284f8b25", "started_at": "2026-02-21 11:41:02", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "6c9a3723-d20f-4cd2-a8fe-89de68aba186", "started_at": "2026-02-21 09:51:01", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "6cc5145d-7ad9-42ff-b740-adf54248c402", "started_at": "2026-02-21 09:16:23", "lang": null, "region": "焼津市内・近く", "place": "焼津市", "interest": null, "turn3_text": null}, {"conversation_id": "6ce6d1df-362c-4c63-bfa1-585ecc3be948", "started_at": "2026-02-21 11:03:24", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しいお店"}, {"conversation_id": "6dc93c2e-aadb-48b2-94d8-f5663ab511a7", "started_at": "2026-02-21 09:34:15", "lang": "Japanese", "region": "焼津市内・近く", "place": "石津", "interest": "美味しく食べる・カフェなど", "turn3_text": "こんにちは"}, {"conversation_id": "6df2c64d-aed5-4149-96b1-9cac9830a24e", "started_at": "2026-02-21 15:26:16", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "6e86a0ec-9dd3-4bc1-9ee0-afb6afdb607d", "started_at": "2026-02-21 10:40:01", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ"}, {"conversation_id": "6fb3aa30-e3ee-4497-9749-36855cffef95", "started_at": "2026-02-21 12:04:31", "lang": "Japanese", "region": "県外から", "place": "愛知県瀬戸市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "714dcbdd-1d9e-488a-b6ee-d95be96452bf", "started_at": "2026-02-21 10:49:07", "lang": null, "region": "県内（焼津市外）", "place": "浜松市", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しい海鮮はありますか？"}, {"conversation_id": "7232d61d-e85e-48d3-b6b7-bf5d27475380", "started_at": "2026-02-21 13:10:56", "lang": "Japanese", "region": "焼津市内・近く", "place": "豊田地区", "interest": null, "turn3_text": null}, {"conversation_id": "723cbc73-06d8-40a0-bad5-c4a67d6e61db", "started_at": "2026-02-21 14:00:59", "lang": "Japanese", "region": "焼津市内・近く", "place": "仕事帰りに", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼"}, {"conversation_id": "730e26bb-7301-485c-a59e-0f38857f7b85", "started_at": "2026-02-21 10:28:43", "lang": "Japanese", "region": "県内（焼津市外）", "place": "磐田市", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しい海鮮丼おしえて"}, {"conversation_id": "74812e8f-34de-48c2-9080-2b008d49bc42", "started_at": "2026-02-21 09:58:06", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津", "interest": "美味しく食べる・カフェなど", "turn3_text": "サーモンいくら親子丼"}, {"conversation_id": "74862bd9-b3f3-4f4a-a9a0-3940329be8fc", "started_at": "2026-02-21 10:39:49", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "75f5c7a4-918d-4b60-b439-3715076780df", "started_at": "2026-02-21 09:22:03", "lang": "Japanese", "region": "県外から", "place": "東京", "interest": "焼津市内の観光", "turn3_text": "小泉八雲記念館"}, {"conversation_id": "7612a43d-a9b5-45cd-ac01-976bd3fadf4f", "started_at": "2026-02-21 13:47:52", "lang": "Japanese", "region": "焼津市内・近く", "place": "五ｹ堀", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "7613c410-23c4-4fc4-9836-4b9eb4dcdc96", "started_at": "2026-02-21 10:14:50", "lang": "Japanese", "region": "焼津市内・近く", "place": "藤枝市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "76e4550e-28f2-46e0-8497-cb0ec69a23cc", "started_at": "2026-02-21 09:15:22", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津", "interest": null, "turn3_text": null}, {"conversation_id": "78915f4b-2f23-444f-a900-b5cd429e8c59", "started_at": "2026-02-21 09:50:03", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "7941493f-d728-46c8-8df4-b6c8a914e0bc", "started_at": "2026-02-21 09:58:45", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼"}, {"conversation_id": "79587195-d778-4584-ad03-6493619ad4a0", "started_at": "2026-02-21 09:52:10", "lang": null, "region": "県外から", "place": "長野県", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼教えて！"}, {"conversation_id": "7a318503-1a17-49de-b1d5-ee8aa28d958e", "started_at": "2026-02-21 10:59:02", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しいまぐろ"}, {"conversation_id": "7abd133e-66dd-4a94-b0a2-4aa22d57ca7c", "started_at": "2026-02-21 11:41:06", "lang": "Japanese", "region": "焼津市内・近く", "place": "栄町", "interest": "焼津市内の観光", "turn3_text": "アートを鑑賞したいです"}, {"conversation_id": "7d87207a-44fd-4670-83a6-b14e25c1eba5", "started_at": "2026-02-21 15:08:07", "lang": "Japanese", "region": "県内（焼津市外）", "place": "浜松市", "interest": "お土産選びから", "turn3_text": "今の旬の魚は？"}, {"conversation_id": "7d8bb95b-2291-480f-976a-4e9f6c4816d9", "started_at": "2026-02-21 10:01:09", "lang": null, "region": null, "place": null, "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "7e2838e6-0f7e-4627-8ed1-0afaff3b7e4a", "started_at": "2026-02-21 10:51:30", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ丼"}, {"conversation_id": "7f1429d7-5d38-4d6c-a28c-ab3dc678a1d2", "started_at": "2026-02-21 11:30:04", "lang": "Japanese", "region": "焼津市内・近く", "place": "三ケ名", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "831e7884-5d7d-4bbb-87ee-133748c2cd53", "started_at": "2026-02-21 15:33:59", "lang": "Japanese", "region": "県内（焼津市外）", "place": "富士宮", "interest": "温泉・港・ミュージアム", "turn3_text": "楽しかったです"}, {"conversation_id": "836be62a-8dff-4b95-a159-ab75f30f357b", "started_at": "2026-02-21 09:19:25", "lang": "Japanese", "region": null, "place": null, "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "85d9e612-8049-4eb7-a46b-29754afdf508", "started_at": "2026-02-21 09:37:44", "lang": "Japanese", "region": "県内（焼津市外）", "place": "愛知県", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ"}, {"conversation_id": "867ce56a-7b77-443f-b688-e7a6101778b7", "started_at": "2026-02-21 09:52:43", "lang": "Japanese", "region": "県外から", "place": "山梨県", "interest": null, "turn3_text": null}, {"conversation_id": "87caaa97-be6a-4ea5-9906-4c39e97feca1", "started_at": "2026-02-21 15:31:39", "lang": "Japanese", "region": "県内（焼津市外）", "place": "浜松市", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "8832ee0d-a051-48e4-a3ac-5387564ecb3f", "started_at": "2026-02-21 14:23:23", "lang": null, "region": "県外から", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "891ce987-0cad-4390-a5c7-15444bd18497", "started_at": "2026-02-21 10:35:47", "lang": "Japanese", "region": "焼津市内・近く", "place": "八楠", "interest": "焼津市内の観光", "turn3_text": "焼津神社"}, {"conversation_id": "89498148-fcec-4ade-94ec-a7e4423663fc", "started_at": "2026-02-21 10:17:31", "lang": "Japanese", "region": "焼津市内・近く", "place": "群馬", "interest": "お土産選びから", "turn3_text": "美味しいたべもの"}, {"conversation_id": "894bc89f-b7ff-4662-8477-e5454979c383", "started_at": "2026-02-21 11:09:14", "lang": "Japanese", "region": "県内（焼津市外）", "place": "磐田市", "interest": "お土産選びから", "turn3_text": "おすすめを教えてください。"}, {"conversation_id": "8b93c210-7394-4564-8ce8-cccafbcc34be", "started_at": "2026-02-21 09:38:34", "lang": null, "region": "県内（焼津市外）", "place": "藤枝", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "8c8e553f-0978-4b45-abbd-ce4735ddf769", "started_at": "2026-02-21 12:19:47", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "8cd2c617-c78d-458d-aa08-534c0799ed78", "started_at": "2026-02-21 10:53:58", "lang": null, "region": "焼津市内・近く", "place": "西焼津", "interest": null, "turn3_text": null}, {"conversation_id": "8d075e9f-cb2a-4ebb-b8c2-94f38152e826", "started_at": "2026-02-21 13:21:41", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝", "interest": "焼津市内の観光", "turn3_text": null}, {"conversation_id": "8d5f532b-242e-42c6-adfd-1a38d1d82e39", "started_at": "2026-02-21 10:00:46", "lang": "Japanese", "region": "県内（焼津市外）", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "8e8ee81a-603d-4438-a804-206ed15d3819", "started_at": "2026-02-21 10:32:17", "lang": "Japanese", "region": "県外から", "place": "名古屋", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ"}, {"conversation_id": "8f6b8877-d3c4-4ca5-8d20-d19564e41925", "started_at": "2026-02-21 11:23:11", "lang": "Japanese", "region": "焼津市内・近く", "place": "近所", "interest": null, "turn3_text": null}, {"conversation_id": "9136faf5-a7e2-4ed2-918d-69e5bca54416", "started_at": "2026-02-21 13:22:11", "lang": "Japanese", "region": "県外から", "place": "一宮", "interest": "焼津市内の観光", "turn3_text": "動物園"}, {"conversation_id": "92a3288e-b857-414d-a0a1-a31d41dcc0c6", "started_at": "2026-02-21 10:36:14", "lang": null, "region": "焼津市内・近く", "place": "越後島", "interest": null, "turn3_text": null}, {"conversation_id": "92bfa875-1573-4cfb-a212-1711e9e351e0", "started_at": "2026-02-21 09:50:05", "lang": "Japanese", "region": "焼津市内・近く", "place": "駅北", "interest": "美味しく食べる・カフェなど", "turn3_text": "こんにちは"}, {"conversation_id": "95909054-c958-4162-865e-32c8d0a14995", "started_at": "2026-02-21 12:48:19", "lang": "Japanese", "region": "焼津市内・近く", "place": "イチゴ狩り", "interest": null, "turn3_text": null}, {"conversation_id": "983e921a-5421-49b6-b516-1cc1fa5ee387", "started_at": "2026-02-21 12:59:37", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": null, "turn3_text": null}, {"conversation_id": "98ab999f-a209-4be4-8355-4eadf69c3ba4", "started_at": "2026-02-21 12:42:30", "lang": "Japanese", "region": "焼津市内・近く", "place": "大富", "interest": null, "turn3_text": null}, {"conversation_id": "9a31d630-3512-4ad4-833e-9b36f56ba84f", "started_at": "2026-02-21 14:17:10", "lang": "Japanese", "region": "焼津市内・近く", "place": "大井川", "interest": "美味しく食べる・カフェなど", "turn3_text": "ビンゴ"}, {"conversation_id": "9abbf34c-00b1-4144-97a4-f230262f902b", "started_at": "2026-02-21 09:35:09", "lang": "Japanese", "region": "県外から", "place": "山梨県", "interest": null, "turn3_text": null}, {"conversation_id": "9b68c5cc-62c2-448b-9ca3-58ef76633216", "started_at": "2026-02-21 11:47:59", "lang": "Japanese", "region": "県内（焼津市外）", "place": "富士宮市", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼"}, {"conversation_id": "9b7328ec-21b9-482c-9c9d-73b1d7b5d2cd", "started_at": "2026-02-21 11:10:11", "lang": "Japanese", "region": "県内（焼津市外）", "place": "磐田市", "interest": "お土産選びから", "turn3_text": "お菓子"}, {"conversation_id": "9ba579f4-7597-441b-9042-7548e36b7603", "started_at": "2026-02-21 10:45:52", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "9c5be1e4-6193-4a87-9fa1-aaee99c8cd62", "started_at": "2026-02-21 10:45:33", "lang": "Japanese", "region": "県外から", "place": "滋賀県", "interest": "焼津市内の観光", "turn3_text": "おすすめグルメは？"}, {"conversation_id": "9ef367bb-8877-4976-9347-eb4aa1a577a8", "started_at": "2026-02-21 11:16:58", "lang": null, "region": "県内（焼津市外）", "place": "静岡市葵区", "interest": "美味しく食べる・カフェなど", "turn3_text": "サーモン丼"}, {"conversation_id": "a0179b8c-bdaa-4340-bd21-4a18451e1231", "started_at": "2026-02-21 12:09:42", "lang": "Japanese", "region": "焼津市内・近く", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "a2293207-45f8-471b-bffd-c89835501de1", "started_at": "2026-02-21 14:01:15", "lang": "Japanese", "region": "焼津市内・近く", "place": "三ケ名", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼"}, {"conversation_id": "a252e3dc-dd18-45e8-beb1-b58c52f13a23", "started_at": "2026-02-21 09:32:52", "lang": "Japanese", "region": "県外から", "place": "長野県", "interest": null, "turn3_text": null}, {"conversation_id": "a4ba7c51-30e9-438c-a79b-36f4965c951a", "started_at": "2026-02-21 12:04:21", "lang": "Japanese", "region": "海外から", "place": "群馬県", "interest": "美味しく食べる・カフェなど", "turn3_text": "旬の魚は？"}, {"conversation_id": "a5bb7833-9e76-4cec-8f0d-0456a05a89f0", "started_at": "2026-02-21 11:37:00", "lang": "Japanese", "region": null, "place": "マグロのおすすめは?", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "a95fa756-4633-497b-9ea3-df718a739298", "started_at": "2026-02-21 16:06:29", "lang": "English", "region": "海外から", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "abcb04f1-787e-4b03-8550-27a39d3fffe5", "started_at": "2026-02-21 10:12:34", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市駿河区", "interest": null, "turn3_text": null}, {"conversation_id": "ac59590f-38d7-444b-93d6-1a5df4f1d941", "started_at": "2026-02-21 10:05:49", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": "お土産選びから", "turn3_text": "海苔の佃煮"}, {"conversation_id": "aca97b1a-946c-4199-b9d6-08d987a793dd", "started_at": "2026-02-21 10:28:34", "lang": "Japanese", "region": "県内（焼津市外）", "place": "駿河区", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼を教えて"}, {"conversation_id": "b1f070c8-2a4a-4cab-9aff-1b4e73c0c671", "started_at": "2026-02-21 11:51:27", "lang": "Japanese", "region": "県外から", "place": "愛知", "interest": "お土産選びから", "turn3_text": null}, {"conversation_id": "b3ef1741-edb1-4b56-b330-fa4fb315b105", "started_at": "2026-02-21 11:14:45", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市葵区", "interest": null, "turn3_text": null}, {"conversation_id": "b4dc81e1-3a46-4df6-932e-fb733cddb358", "started_at": "2026-02-21 11:50:57", "lang": null, "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "b5fb5588-2d43-420f-bcf4-5c6876bc05c2", "started_at": "2026-02-21 12:01:48", "lang": "Japanese", "region": "焼津市内・近く", "place": "島田市", "interest": "焼津市内の観光", "turn3_text": "マグロ"}, {"conversation_id": "b71a309d-5fc7-4363-8d64-4d8caed757d4", "started_at": "2026-02-21 10:33:47", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しい海鮮教えて"}, {"conversation_id": "b74a6994-8ad7-47bf-81f1-cda871698be3", "started_at": "2026-02-21 12:18:31", "lang": "Japanese", "region": "県外から", "place": "品川区", "interest": null, "turn3_text": null}, {"conversation_id": "b9f9a5b0-de96-4e1e-8d63-89e095442abc", "started_at": "2026-02-21 09:21:10", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "b9ffb463-4113-4d96-87dc-de4f1e787a17", "started_at": "2026-02-21 11:47:39", "lang": "Japanese", "region": "県外から", "place": "愛知県", "interest": null, "turn3_text": null}, {"conversation_id": "ba01ba5e-8b58-408d-82a7-d63cd4e80c8a", "started_at": "2026-02-21 14:11:28", "lang": "Japanese", "region": "県外から", "place": "長野県", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "babd3ae3-1f03-4672-a6da-6109b9b60c2d", "started_at": "2026-02-21 11:40:52", "lang": "Japanese", "region": "県外から", "place": "アンドロメダ", "interest": "焼津市内の観光", "turn3_text": "焼津神社からアンドロメダに帰ります"}, {"conversation_id": "c11ef361-6b84-4f87-a9a3-b15f6007979d", "started_at": "2026-02-21 11:58:28", "lang": null, "region": "県内（焼津市外）", "place": "富士市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "c1de3647-01f4-4c90-b42d-6a0884a36efe", "started_at": "2026-02-21 11:28:57", "lang": "Japanese", "region": null, "place": null, "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮が買えるところ教えて"}, {"conversation_id": "c4dc9046-4c76-4eb0-9910-0f6377224b40", "started_at": "2026-02-21 10:35:15", "lang": "Japanese", "region": "県外から", "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "c7227541-220b-4af2-901c-d4ae5ef63230", "started_at": "2026-02-21 09:33:15", "lang": null, "region": "焼津市内・近く", "place": "神奈川", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの海鮮丼をおしえて"}, {"conversation_id": "c79bbdd7-ad4d-48a5-8243-e4984ac424d9", "started_at": "2026-02-21 12:04:20", "lang": "Japanese", "region": "県外から", "place": "群馬県", "interest": "焼津市内の観光", "turn3_text": "子供が楽しめる場所"}, {"conversation_id": "c7c30144-4bcc-49e6-b269-37ed87df01ca", "started_at": "2026-02-21 13:13:25", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "お土産選びから", "turn3_text": null}, {"conversation_id": "cb1d9768-17c0-47b5-b16e-7fc71775c3d4", "started_at": "2026-02-21 13:31:01", "lang": "Japanese", "region": "県内（焼津市外）", "place": "富士宮", "interest": "美味しく食べる・カフェなど", "turn3_text": "マグロ"}, {"conversation_id": "cc085803-67a0-4e34-a579-36287a88f2a6", "started_at": "2026-02-21 09:42:40", "lang": "Japanese", "region": "県外から", "place": "東京", "interest": null, "turn3_text": null}, {"conversation_id": "cd666be7-8cb4-4b78-bfe7-7cd7b8b7bc78", "started_at": "2026-02-21 12:17:51", "lang": "Japanese", "region": "県外から", "place": "東京", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼"}, {"conversation_id": "cd934669-3c40-45ad-bac5-97deeb4d60c2", "started_at": "2026-02-21 10:06:11", "lang": "Japanese", "region": "焼津市内・近く", "place": "一色", "interest": "美味しく食べる・カフェなど", "turn3_text": "お刺身"}, {"conversation_id": "ce99f829-ce9b-41fa-b0aa-063f5bf100ed", "started_at": "2026-02-21 14:20:51", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "お土産選びから", "turn3_text": "ビンゴに来た"}, {"conversation_id": "d0a47784-05ed-47f7-939c-c82bde6d83bd", "started_at": "2026-02-21 10:30:38", "lang": "Japanese", "region": "県内（焼津市外）", "place": "浜松市", "interest": "お土産選びから", "turn3_text": "楽しいことは何"}, {"conversation_id": "d0d417a1-848f-4b09-8421-4319ff8a3240", "started_at": "2026-02-21 09:55:41", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝", "interest": null, "turn3_text": null}, {"conversation_id": "d0fb1be2-3af6-4c29-8779-05b543bda50e", "started_at": "2026-02-21 09:54:28", "lang": "Japanese", "region": "県外から", "place": "兵庫県", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しい海鮮丼は？"}, {"conversation_id": "d21087ed-255a-4668-8485-c36b37e8d8c4", "started_at": "2026-02-21 09:30:45", "lang": "Japanese", "region": "県外から", "place": "小田原", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "d3b9b8ec-0f4b-45b3-a45c-fb61e47d8fcd", "started_at": "2026-02-21 10:22:34", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "d4647a9a-86a1-4bc4-9149-75a076d78868", "started_at": "2026-02-21 10:19:32", "lang": "Japanese", "region": "県外から", "place": "東京都杉並区", "interest": "温泉・港・ミュージアム", "turn3_text": null}, {"conversation_id": "d4e6b6ad-486c-4f2f-a5a5-752d8c30da3b", "started_at": "2026-02-21 12:19:13", "lang": "Japanese", "region": "県内（焼津市外）", "place": "焼津", "interest": null, "turn3_text": null}, {"conversation_id": "d5cff53e-618b-4b7d-8dbe-d7fab0f03f1c", "started_at": "2026-02-21 13:34:33", "lang": "Japanese", "region": "県外から", "place": "山梨", "interest": "焼津市内の観光", "turn3_text": "桜見た"}, {"conversation_id": "d64944ea-7576-4115-b5a7-1a8c2cba7be8", "started_at": "2026-02-21 09:42:47", "lang": "Japanese", "region": "県外から", "place": "東京", "interest": null, "turn3_text": null}, {"conversation_id": "d75eb314-70cd-493f-9feb-468545335caa", "started_at": "2026-02-21 12:19:06", "lang": "Japanese", "region": "焼津市内・近く", "place": "牧之原", "interest": null, "turn3_text": null}, {"conversation_id": "d8b235db-4eed-41d8-91c7-76023aba9f37", "started_at": "2026-02-21 09:52:43", "lang": "Japanese", "region": "県外から", "place": "長野県山形村", "interest": "美味しく食べる・カフェなど", "turn3_text": "まぐろ"}, {"conversation_id": "d8c3ea90-32ba-48cb-b1e0-135fbc7371f1", "started_at": "2026-02-21 12:06:12", "lang": "Japanese", "region": "県外から", "place": "小田原", "interest": "焼津市内の観光", "turn3_text": null}, {"conversation_id": "dc6df226-d193-4acc-b6c2-097bb74a8be3", "started_at": "2026-02-21 11:10:36", "lang": null, "region": "焼津市内・近く", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "dc7e2846-00b1-4560-afc5-ab97b3c4ac87", "started_at": "2026-02-21 10:52:44", "lang": "Japanese", "region": "焼津市内・近く", "place": "市内の近場", "interest": null, "turn3_text": null}, {"conversation_id": "dd78af93-57ef-421a-ae5c-679b35509f6b", "started_at": "2026-02-21 12:34:20", "lang": "Japanese", "region": "県外から", "place": "愛知県", "interest": null, "turn3_text": null}, {"conversation_id": "dde1df77-73a4-4779-a3a5-46a60b19d966", "started_at": "2026-02-21 14:28:00", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津", "interest": "お土産選びから", "turn3_text": "おすすめの魚を教えて"}, {"conversation_id": "df9ef64d-9327-48ed-b8d6-7a9713f74d76", "started_at": "2026-02-21 12:16:49", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": null, "turn3_text": null}, {"conversation_id": "dfbdde35-5b5a-48df-9dab-3a62b8b3c8b0", "started_at": "2026-02-21 15:31:32", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "お土産選びから", "turn3_text": "干物、刺身"}, {"conversation_id": "e023544b-0137-41f4-8e96-579ddbaf62eb", "started_at": "2026-02-21 10:21:50", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡県湖西市鷲津", "interest": "美味しく食べる・カフェなど", "turn3_text": "オススメポイントは？"}, {"conversation_id": "e0ab61cf-ebc9-4cca-b9b9-648374cde273", "started_at": "2026-02-21 11:55:56", "lang": "Japanese", "region": "県外から", "place": "神奈川県", "interest": "温泉・港・ミュージアム", "turn3_text": "海が見えるところ"}, {"conversation_id": "e10550d6-2ab3-4f20-9663-570bfdf03566", "started_at": "2026-02-21 09:57:42", "lang": "Japanese", "region": "県内（焼津市外）", "place": "島田市", "interest": "美味しく食べる・カフェなど", "turn3_text": "美味しいお魚教えて"}, {"conversation_id": "e30f8c5f-d758-4503-8562-7ac3079a7299", "started_at": "2026-02-21 13:37:57", "lang": "Japanese", "region": "県外から", "place": "横浜市", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼の店が知りたい"}, {"conversation_id": "e52dde69-f5f9-460f-8fd6-acd1d0c7cadc", "started_at": "2026-02-21 09:51:51", "lang": "Japanese", "region": "県外から", "place": "島田市", "interest": "温泉・港・ミュージアム", "turn3_text": "水族館はある？"}, {"conversation_id": "e58bd0c7-c1f6-4609-941b-f417f8bf3d27", "started_at": "2026-02-21 13:50:42", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼"}, {"conversation_id": "e8b5f19b-c46c-4421-9159-ca3e6b8f74c1", "started_at": "2026-02-21 10:10:53", "lang": "Japanese", "region": "県内（焼津市外）", "place": "御殿場", "interest": "美味しく食べる・カフェなど", "turn3_text": "海鮮丼のおすすめ教えて"}, {"conversation_id": "ea470d19-0477-4d85-94f5-06d00d44dfb9", "started_at": "2026-02-21 12:48:38", "lang": "Japanese", "region": "県外から", "place": "瀬戸市", "interest": "焼津市内の観光", "turn3_text": "いちご狩り"}, {"conversation_id": "ebb95623-39b8-40d2-9545-1aa46c46e658", "started_at": "2026-02-21 10:01:17", "lang": null, "region": "県内（焼津市外）", "place": "静岡市", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "ec3f7281-ae19-4685-a5f0-1fb8e4614067", "started_at": "2026-02-21 14:13:47", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津", "interest": "温泉・港・ミュージアム", "turn3_text": "何処がオススメですか"}, {"conversation_id": "edfc9edc-e759-42bc-8720-715217a51504", "started_at": "2026-02-21 10:37:52", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "ee3a68e7-ca47-4085-ab73-ab8b681cf6b7", "started_at": "2026-02-21 12:43:41", "lang": "Japanese", "region": "県内（焼津市外）", "place": "藤枝市", "interest": null, "turn3_text": null}, {"conversation_id": "ee6e04f7-d0a2-45b1-9ced-16b4be29608b", "started_at": "2026-02-21 12:19:24", "lang": "Japanese", "region": "焼津市内・近く", "place": "牧之原市", "interest": null, "turn3_text": null}, {"conversation_id": "ef1deae6-8752-43e0-92ce-ce955b683131", "started_at": "2026-02-21 09:54:05", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市", "interest": "美味しく食べる・カフェなど", "turn3_text": "釜飯手毬"}, {"conversation_id": "ef583480-cee6-42be-b3d5-c4ae9e7c1230", "started_at": "2026-02-21 09:53:20", "lang": "Japanese", "region": null, "place": "鮪が美味しい店は？", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "ef832f4b-6705-454e-b100-dec7bb74f7d4", "started_at": "2026-02-21 09:31:19", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "ef9eb3a2-ff6e-4c1a-abf9-5b6aa92c68db", "started_at": "2026-02-21 10:09:35", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市", "interest": "お土産選びから", "turn3_text": null}, {"conversation_id": "f2deeb88-aad6-4870-ac7b-58c4e5400706", "started_at": "2026-02-21 11:44:11", "lang": "Japanese", "region": "焼津市内・近く", "place": "生牡蠣がたべたいです", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめの焼津観光を教えて"}, {"conversation_id": "f309c9eb-4a1b-4a54-863b-06986d2c0b63", "started_at": "2026-02-21 10:40:12", "lang": "Japanese", "region": null, "place": "マグロ", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "f345221f-d3ed-4c37-93ac-da183c023dc7", "started_at": "2026-02-21 15:33:23", "lang": "Japanese", "region": "県内（焼津市外）", "place": "静岡市清水区", "interest": "美味しく食べる・カフェなど", "turn3_text": "おすすめのランチおしえて！"}, {"conversation_id": "f48c669d-00ea-4f86-9f61-8ab90c3ae891", "started_at": "2026-02-21 10:40:02", "lang": "Japanese", "region": "焼津市内・近く", "place": "焼津市石津", "interest": "美味しく食べる・カフェなど", "turn3_text": null}, {"conversation_id": "f67a0cbd-386f-4c3d-b2b8-4ba94c481db0", "started_at": "2026-02-21 09:55:28", "lang": "Japanese", "region": null, "place": null, "interest": null, "turn3_text": null}, {"conversation_id": "f6f7540f-ae0f-4297-b5cd-0e59e48d1e86", "started_at": "2026-02-21 11:55:32", "lang": "Japanese", "region": "県内（焼津市外）", "place": "相模原市", "interest": "焼津市内の観光", "turn3_text": "おさかなセンター"}, {"conversation_id": "f710303c-2a9e-441f-b599-8dcf71b95501", "started_at": "2026-02-21 10:48:42", "lang": "Japanese", "region": "焼津市内・近く", "place": "近所", "interest": "美味しく食べる・カフェなど", "turn3_text": "教えて"}, {"conversation_id": "feeec898-3fbc-4216-80f3-a41c78530e33", "started_at": "2026-02-21 12:19:18", "lang": "Japanese", "region": "県内（焼津市外）", "place": "三右衛門新田", "interest": null, "turn3_text": null}, {"conversation_id": "ff322a5f-b515-436a-a3cb-a2faf431fc68", "started_at": "2026-02-21 10:41:03", "lang": null, "region": "焼津市内・近く", "place": "このあたり", "interest": "お土産選びから", "turn3_text": null}]}</script>
 <script>
-const DATA = JSON.parse(document.getElementById('DATA').textContent);
-const summaries = DATA.summaries;
-const agg = DATA.agg;
-
-const $ = (id)=>document.getElementById(id);
-const fLang=$('fLang'), fRegion=$('fRegion'), fInterest=$('fInterest'), fPlace=$('fPlace');
-
-function uniq(arr){ return Array.from(new Set(arr)).filter(v=>v!==null && v!==undefined && String(v).trim()!=='');}
-function fillSelect(sel, values){
-  sel.innerHTML='';
-  const sorted = values.slice().sort((a,b)=>String(a).localeCompare(String(b),'ja'));
-  for(const v of sorted){
-    const o=document.createElement('option');
-    o.value=v; o.textContent=v; o.selected=true;
-    sel.appendChild(o);
-  }
-}
-function selected(sel){ return Array.from(sel.selectedOptions).map(o=>o.value); }
-function pct(n,d){ if(!d) return '-'; return (Math.round((n/d)*1000)/10)+'%'; }
-
-function setMeta(){
-  $('metaUU').textContent = `UU: ${agg.uu.toLocaleString('ja-JP')}`;
-  $('metaGen').textContent = `generated: ${agg.meta.generated_at_jst}`;
-  $('metaSrc').textContent = `source: ${agg.meta.source_file}`;
-}
-function setKPI(rows){
-  // UU should be the TOTAL unique conversation_id count (e.g., 205), not the filtered row count.
-  const uuTotal = (agg && typeof agg.uu === 'number')
-    ? agg.uu
-    : uniq(summaries.map(r=>r.conversation_id)).length;
-
-  // Keep filtered denominator for step-reach KPIs so filters still behave naturally.
-  const uuFiltered = new Set(rows.map(r=>r.conversation_id).filter(Boolean)).size || rows.length;
-
-  $('kUU').textContent = uuTotal.toLocaleString('ja-JP');
-  $('kUU').title = `filtered UU: ${uuFiltered.toLocaleString('ja-JP')}`;
-
-  const t1 = rows.filter(r=>r.region && String(r.region).trim()!=='').length;
-  const t15 = rows.filter(r=>r.place && String(r.place).trim()!=='').length;
-  const t2 = rows.filter(r=>r.interest && String(r.interest).trim()!=='').length;
-  const t3 = rows.filter(r=>r.turn3_text && String(r.turn3_text).trim()!=='').length;
-
-  $('kT1').textContent = pct(t1, uuFiltered);
-  $('kT15').textContent = pct(t15, uuFiltered);
-  $('kT2').textContent = pct(t2, uuFiltered);
-  $('kT3').textContent = pct(t3, uuFiltered);
-}
-
-
-
-function renderFunnel(rows){
-  const el = document.getElementById('funnel');
-  if(!el) return;
-
-  const mode = window.__funnelMode || 'overall'; // 'overall' | 'step'
-  const total = rows.length;
-  const has = (v)=> v && String(v).trim()!=='';
-  const cT1  = rows.filter(r=>has(r.region)).length;
-  const cT15 = rows.filter(r=>has(r.place)).length;
-  const cT2  = rows.filter(r=>has(r.interest)).length;
-  const cT3  = rows.filter(r=>has(r.turn3_text)).length;
-
-  const steps = [
-    {label:'Start',   count: total},
-    {label:'Turn1',   count: cT1},
-    {label:'Turn1.5', count: cT15},
-    {label:'Turn2',   count: cT2},
-    {label:'Turn3',   count: cT3},
-  ];
-
-  el.innerHTML = '';
-  const max = total || 1;
-  let prev = total || 0;
-
-  for(const s of steps){
-    const w = Math.max(0, Math.min(100, (s.count/max)*100));
-    const stepRate = (s.label==='Start') ? null : (prev ? (s.count/prev) : 0);
-    const overallRate = total ? (s.count/total) : 0;
-
-    let rateText = '';
-    if(mode === 'overall'){
-      rateText = `${(overallRate*100).toFixed(1)}%`;
-    }else{
-      rateText = (stepRate===null) ? '—' : `${(stepRate*100).toFixed(1)}%`;
-    }
-
-    const row = document.createElement('div');
-    row.className = 'funnelrow';
-    row.innerHTML = `
-      <div class="funnelstep" title="${s.label}">${s.label}</div>
-      <div class="funnelbar" aria-label="${s.label}"><span style="width:${w}%;"></span></div>
-      <div class="funnelcount">${s.count.toLocaleString('ja-JP')}</div>
-      <div class="funnelrate">${rateText}</div>
-    `;
-    el.appendChild(row);
-    prev = s.count;
-  }
-
-  const note = document.createElement('div');
-  note.className = 'muted';
-  note.style.marginTop = '8px';
-  note.textContent = (mode === 'overall')
-    ? '右端：全体到達率（overall）'
-    : '右端：直前ステップからの遷移率（step）';
-  el.appendChild(note);
-}
+// =========================
+// DATA SOURCE (Auto CSV)
+// =========================
+// 例）同階層に summary.csv を置く（GitHub PagesでもOK）
+const AUTO_CSV_URL = "./summary.csv"; // ←必要に応じて変更
 
 // =========================
 // NORMALIZE HELPERS (FIX: keep unknown rows)
@@ -418,173 +310,69 @@ function countBy(rows, key){
   }
   return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]);
 }
-function renderBarList(el, items, maxItems=999){
-  el.innerHTML='';
-  const sliced = items.slice(0,maxItems);
-  const max = sliced.length ? sliced[0][1] : 1;
-  for(const [label,val] of sliced){
-    const row=document.createElement('div');
-    row.className='barrow';
-    const safe = String(label).replaceAll('"','&quot;');
-    row.innerHTML = `
-      <div class="barlabel" title="${safe}">${label}</div>
-      <div class="bar"><span style="width:${(val/max)*100}%;"></span></div>
-      <div class="barnum">${val}</div>
-    `;
-    el.appendChild(row);
-  }
-  if(!sliced.length){
-    el.innerHTML = '<div class="muted">（データなし）</div>';
+
+// =========================
+// STATE
+// =========================
+let summaries = [];  // unified rows
+let charts = {};
+let lastUpdated = null;
+let currentSource = '(none)';
+
+// =========================
+// DOM
+// =========================
+const fLang = document.getElementById('fLang');
+const fRegion = document.getElementById('fRegion');
+const fInterest = document.getElementById('fInterest');
+const fPlace = document.getElementById('fPlace');
+
+const tagCloud = document.getElementById('tagCloud');
+const topPlaces = document.getElementById('topPlaces');
+const loadStatus = document.getElementById('loadStatus');
+
+const kpiSessions = document.getElementById('kpiSessions');
+const kpiLangs = document.getElementById('kpiLangs');
+const kpiRegions = document.getElementById('kpiRegions');
+const kpiInterests = document.getElementById('kpiInterests');
+
+const dataMode = document.getElementById('dataMode');
+const dataUpdated = document.getElementById('dataUpdated');
+const dataRows = document.getElementById('dataRows');
+const dataSource = document.getElementById('dataSource');
+const debug = document.getElementById('debug');
+
+// =========================
+// UI HELPERS
+// =========================
+function setStatus(kind, msg){
+  loadStatus.className = kind==='ok' ? 'ok' : 'warn';
+  loadStatus.textContent = msg;
+}
+
+function fillSelect(sel, values){
+  sel.innerHTML='';
+  const opts = values.slice().sort((a,b)=>String(a).localeCompare(String(b),'ja'));
+  for(const v of opts){
+    const o=document.createElement('option');
+    o.value=v; o.textContent=v;
+    sel.appendChild(o);
   }
 }
 
-function renderCross(rows){
-  const regions = uniq(rows.map(r=>r.region||'(unknown)'));
-  const interests = uniq(rows.map(r=>r.interest||'(unknown)'));
-  regions.sort((a,b)=>String(a).localeCompare(String(b),'ja'));
-  interests.sort((a,b)=>String(a).localeCompare(String(b),'ja'));
-
-  const head=$('crossHead');
-  head.innerHTML='';
-  const th0=document.createElement('th');
-  th0.textContent='region \\ interest';
-  head.appendChild(th0);
-  for(const it of interests){
-    const th=document.createElement('th'); th.textContent=it; head.appendChild(th);
-  }
-
-  const body=$('crossBody');
-  body.innerHTML='';
-  for(const rg of regions){
-    const tr=document.createElement('tr');
-    const td0=document.createElement('td');
-    td0.textContent=rg; td0.style.fontWeight='800';
-    tr.appendChild(td0);
-    for(const it of interests){
-      const v = rows.filter(r=>(r.region||'(unknown)')===rg && (r.interest||'(unknown)')===it).length;
-      const td=document.createElement('td');
-      td.textContent = v? v.toLocaleString('ja-JP') : '';
-      tr.appendChild(td);
-    }
-    body.appendChild(tr);
-  }
+function selected(sel){
+  return Array.from(sel.selectedOptions).map(o=>o.value);
 }
 
-function buildWordFreq(rows){
-  const texts = rows.map(r=>r.turn3_text).filter(Boolean).map(String);
-  const joined = texts.join(' ');
-  const tokens = [];
-  // English
-  joined.split(/[^A-Za-z]+/).forEach(w=>{
-    const t=w.trim().toLowerCase();
-    if(t.length>=3) tokens.push(t);
-  });
-  // Japanese sequences -> bigrams
-  const jp = joined.match(/[一-龯ぁ-んァ-ン]{2,}/g) || [];
-  for(const seq of jp){
-    const s=seq.trim();
-    if(s.length<=3) tokens.push(s);
-    else for(let i=0;i<s.length-1;i++) tokens.push(s.slice(i,i+2));
-  }
-  const m=new Map();
-  for(const t of tokens) m.set(t,(m.get(t)||0)+1);
-  const list = Array.from(m.entries()).filter(([w,c])=>c>=2).sort((a,b)=>b[1]-a[1]).slice(0,140);
-  return list;
-}
-function renderTagCloud(rows){
-  const list = buildWordFreq(rows);
-  const el=$('tagCloud');
-  el.innerHTML='';
-  if(!list.length){
-    el.innerHTML='<div class="muted">（Turn3のテキストが少ない、またはフィルタで除外されています）</div>';
-    return;
-  }
-  const max=list[0][1];
-  for(const [w,c] of list){
-    const span=document.createElement('span');
-    span.className='tag';
-    const size = 12 + (c/max)*18; // 12-30px
-    span.style.fontSize = size.toFixed(1)+'px';
-    span.textContent = w;
-    const sm=document.createElement('small');
-    sm.textContent = c;
-    span.appendChild(sm);
-    el.appendChild(span);
-  }
+function formatDT(d){
+  if(!d) return '-';
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function buildSankeyLinks(rows){
-  const links=[];
-  const m1=new Map(), m2=new Map();
-  for(const r of rows){
-    if(r.lang && r.region){
-      const k=r.lang+'||'+r.region;
-      m1.set(k,(m1.get(k)||0)+1);
-    }
-    if(r.region && r.interest){
-      const k=r.region+'||'+r.interest;
-      m2.set(k,(m2.get(k)||0)+1);
-    }
-  }
-  for(const [k,v] of m1.entries()){
-    const [s,t]=k.split('||');
-    links.push({source:s,target:t,value:v,stage:1});
-  }
-  for(const [k,v] of m2.entries()){
-    const [s,t]=k.split('||');
-    links.push({source:s,target:t,value:v,stage:2});
-  }
-  links.sort((a,b)=>b.value-a.value);
-  return links;
-}
-function renderSankeyTable(rows){
-  const links=buildSankeyLinks(rows).slice(0,160);
-  const body=$('sankeyBody');
-  body.innerHTML='';
-  for(const l of links){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${l.source}</td><td>${l.target}</td><td>${l.value}</td><td>${l.stage}</td>`;
-    body.appendChild(tr);
-  }
-}
-
-function renderSummaryTable(rows){
-  const body=$('summaryBody');
-  body.innerHTML='';
-  const cols=['conversation_id','lang','region','place','interest','turn3_text','started_at'];
-  rows.slice(0,200).forEach(r=>{
-    const tr=document.createElement('tr');
-    cols.forEach(c=>{
-      const td=document.createElement('td');
-      td.textContent = (r[c] ?? '');
-      tr.appendChild(td);
-    });
-    body.appendChild(tr);
-  });
-}
-
-function toCSV(rows, headers){
-  const esc = (v)=>{
-    const s = (v===null||v===undefined)? '' : String(v);
-    return /[",\n]/.test(s) ? '"' + s.replaceAll('"','""') + '"' : s;
-  };
-  const lines=[];
-  lines.push(headers.map(esc).join(','));
-  for(const r of rows){
-    lines.push(headers.map(h=>esc(r[h])).join(','));
-  }
-  return lines.join('\n');
-}
-function downloadText(filename, text){
-  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=filename;
-  document.body.appendChild(a);
-  a.click(); a.remove();
-  URL.revokeObjectURL(url);
-}
-
+// =========================
+// FILTERS (FIX: compare with normalized values)
+// =========================
 function applyFilters(){
   const langs=selected(fLang);
   const regions=selected(fRegion);
@@ -595,134 +383,357 @@ function applyFilters(){
     const langN = norm(r.lang);
     const regionN = norm(r.region);
     const interestN = norm(r.interest);
-    const placeRaw = (r.place===null || r.place===undefined) ? '' : String(r.place);
+    const placeN = norm(r.place).toLowerCase();
 
-    const okLang = !langs.length || langs.includes(langN);
-    const okRegion = !regions.length || regions.includes(regionN);
-    const okInterest = !interests.length || interests.includes(interestN);
-    // place は未知扱いにせず「部分一致検索」なので raw を使う（空はヒットしない）
-    const okPlace = !q || placeRaw.toLowerCase().includes(q);
-
-    return okLang && okRegion && okInterest && okPlace;
+    if(langs.length && !langs.includes(langN)) return false;
+    if(regions.length && !regions.includes(regionN)) return false;
+    if(interests.length && !interests.includes(interestN)) return false;
+    if(q && !placeN.includes(q)) return false;
+    return true;
   });
 
-  setKPI(rows);
-  renderFunnel(rows);
-
-  renderBarList(document.getElementById('regionBars'), countBy(rows,'region'));
-  renderBarList(document.getElementById('placeBars'), countBy(rows,'place'), 20);
-  renderCross(rows);
-  renderTagCloud(rows);
-  renderSankeyTable(rows);
-  renderSummaryTable(rows);
-
-  window.__filteredRows = rows;
-  window.__filteredSankey = buildSankeyLinks(rows);
+  renderAll(rows);
 }
 
 function resetFilters(){
-  [fLang,fRegion,fInterest].forEach(sel=>Array.from(sel.options).forEach(o=>o.selected=true));
+  Array.from(fLang.options).forEach(o=>o.selected=false);
+  Array.from(fRegion.options).forEach(o=>o.selected=false);
+  Array.from(fInterest.options).forEach(o=>o.selected=false);
   fPlace.value='';
   applyFilters();
-
-  // Funnel display mode toggle (overall-only / step-only)
-  window.__funnelMode = window.__funnelMode || 'overall';
-  const segBtns = Array.from(document.querySelectorAll('.segbtn[data-mode]'));
-  const setFunnelMode = (m)=>{
-    window.__funnelMode = m;
-    segBtns.forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
-    renderFunnel(window.__filteredRows || summaries);
-  };
-  segBtns.forEach(b=>b.addEventListener('click', ()=>setFunnelMode(b.dataset.mode)));
-  setFunnelMode(window.__funnelMode);
-
 }
 
-function init(){
-  setMeta();
+// =========================
+// CHARTS
+// =========================
+function makeChart(id, labels, data){
+  const ctx=document.getElementById(id);
+  if(charts[id]) charts[id].destroy();
 
+  charts[id]=new Chart(ctx,{
+    type:'bar',
+    data:{labels, datasets:[{label:'count', data}]},
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{autoSkip:false, maxRotation:60, minRotation:0}},
+        y:{beginAtZero:true}
+      }
+    }
+  });
+}
+
+// =========================
+// WORD CLOUD (Tag-style) — noun-ish
+// =========================
+function buildWordFreq(rows){
+  // Build a "noun-ish" frequency list from Turn3 free-text.
+  // (No morphological analyzer in browser, so we use robust heuristics + stopwords.)
+  const texts = rows.map(r=>r.turn3_text).filter(v=>v!==null && v!==undefined && String(v).trim()!=='').map(String);
+  const joined = texts.join(' ');
+
+  // --- Stopwords (JP) ---
+  const JP_STOP = new Set([
+    // particles / auxiliaries
+    'の','こと','もの','これ','それ','あれ','ここ','そこ','あそこ','こちら','そちら','あちら',
+    'は','が','を','に','へ','と','で','も','や','から','まで','より','など','だけ','ほど','くらい',
+    'そして','しかし','でも','また','または','つまり','なので','だから','けど','けれど','さらに','ちなみに',
+    // polite / common function words
+    'です','ます','でした','ません','ください','お願い','ありがとう','ありがとうございます',
+    // common chat filler
+    '今日','今','いま','今回','こちら','こちらこそ',
+    // very generic tourism / shop words (optional, keep if you want)
+    // 'お店','おみせ','店'
+  ]);
+
+  // --- Stopwords (EN) ---
+  const EN_STOP = new Set([
+    'the','and','or','but','to','of','in','on','for','with','at','by','from','as','is','are','was','were','be','been','being',
+    'i','you','we','they','he','she','it','this','that','these','those','there','here','please','thanks','thank'
+  ]);
+
+  function isAllHiragana(s){ return /^[ぁ-んー]+$/.test(s); }
+  function isAllKatakana(s){ return /^[ァ-ンー]+$/.test(s); }
+
+  function looksLikeVerbEndingJP(t){
+    // Exclude typical verb/auxiliary endings so we bias toward nouns.
+    // (Heuristic; tune freely.)
+    return /(する|して|した|してる|していた|してます|したい|できる|です|ます|でした|ません|ない|なかった|たい|てる|って)$/.test(t);
+  }
+
+  function keepJPToken(t){
+    if(!t) return false;
+    if(JP_STOP.has(t)) return false;
+
+    // Drop very short tokens
+    if(t.length<=1) return false;
+
+    // Drop pure hiragana short words (often particles/aux)
+    if(isAllHiragana(t)){
+      if(t.length<=3) return false;
+      // longer hiragana may still be a noun (e.g., さかな) -> keep if not stopword
+      return !JP_STOP.has(t);
+    }
+
+    // Drop katakana too short
+    if(isAllKatakana(t) && t.length<=1) return false;
+
+    // Bias away from verbs/aux if it ends like a verb
+    if(looksLikeVerbEndingJP(t)) return false;
+
+    return true;
+  }
+
+  function keepENToken(t){
+    if(!t) return false;
+    if(t.length<3) return false;
+    if(EN_STOP.has(t)) return false;
+    return true;
+  }
+
+  const tokens = [];
+
+  // English words
+  (joined.match(/[A-Za-z]{3,}/g) || []).forEach(w=>{
+    const t=w.toLowerCase();
+    if(keepENToken(t)) tokens.push(t);
+  });
+
+  // Numbers / alphanum chunks (optional)
+  (joined.match(/[A-Za-z0-9]{3,}/g) || []).forEach(w=>{
+    const t=w.toLowerCase();
+    if(keepENToken(t)) tokens.push(t);
+  });
+
+  // Japanese "noun-ish" chunks:
+  // 1) Kanji sequences (2+)
+  (joined.match(/[一-龯々〆ヵヶ]{2,}/g) || []).forEach(t=>{
+    if(keepJPToken(t)) tokens.push(t);
+  });
+
+  // 2) Katakana sequences (2+)
+  (joined.match(/[ァ-ンー]{2,}/g) || []).forEach(t=>{
+    if(keepJPToken(t)) tokens.push(t);
+  });
+
+  // 3) Mixed Kanji+Hiragana (e.g., 海鮮丼, おすすめ, 教えて) — keep if passes heuristics
+  (joined.match(/[一-龯々〆ヵヶ]+[ぁ-んー]{1,4}/g) || []).forEach(t=>{
+    if(keepJPToken(t)) tokens.push(t);
+  });
+
+  // 4) Longer hiragana nouns (4+)
+  (joined.match(/[ぁ-んー]{4,}/g) || []).forEach(t=>{
+    if(keepJPToken(t)) tokens.push(t);
+  });
+
+  const m=new Map();
+  for(const t of tokens) m.set(t,(m.get(t)||0)+1);
+
+  // keep >=2 and cap
+  const list = Array.from(m.entries())
+    .filter(([w,c])=>c>=2)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,140);
+
+  return list;
+}
+
+function renderTagCloud(rows){
+  const wf = buildWordFreq(rows);
+  tagCloud.innerHTML = '';
+  if(!wf.length){
+    tagCloud.innerHTML = '<div class="muted small">（頻出語がありません）</div>';
+    return;
+  }
+  const counts = wf.map(x=>x[1]);
+  const max = Math.max(...counts);
+  const min = Math.min(...counts);
+
+  for(const [w,c] of wf){
+    const t=document.createElement('div');
+    t.className='tag';
+
+    // size 12..34
+    const s = (max===min) ? 18 : (12 + (c-min) * (34-12) / (max-min));
+    t.style.fontSize = `${s.toFixed(1)}px`;
+
+    const b=document.createElement('b'); b.textContent=w;
+    const sp=document.createElement('span'); sp.textContent=c;
+
+    t.appendChild(b);
+    t.appendChild(sp);
+    tagCloud.appendChild(t);
+  }
+}
+
+// =========================
+// TOP PLACE LIST
+// =========================
+function renderTopPlaces(rows){
+  const pairs = countBy(rows, 'place').slice(0,12);
+  if(!pairs.length){
+    topPlaces.innerHTML = '<div class="muted">（該当なし）</div>';
+    return;
+  }
+  topPlaces.innerHTML = pairs.map(([k,v])=>{
+    return `<div class="pill"><b>${escapeHtml(k)}</b> <span class="muted">${v}</span></div>`;
+  }).join(' ');
+}
+
+// =========================
+// RENDER ALL
+// =========================
+function renderAll(rows){
+  // KPIs
+  kpiSessions.textContent = rows.length;
+  kpiLangs.textContent = uniqNorm(rows.map(r=>r.lang)).length;
+  kpiRegions.textContent = uniqNorm(rows.map(r=>r.region)).length;
+  kpiInterests.textContent = uniqNorm(rows.map(r=>r.interest)).length;
+
+  // charts
+  const langPairs = countBy(rows, 'lang').slice(0,12);
+  makeChart('chartLang', langPairs.map(x=>x[0]), langPairs.map(x=>x[1]));
+
+  const regionPairs = countBy(rows, 'region').slice(0,12);
+  makeChart('chartRegion', regionPairs.map(x=>x[0]), regionPairs.map(x=>x[1]));
+
+  const interestPairs = countBy(rows, 'interest').slice(0,12);
+  makeChart('chartInterest', interestPairs.map(x=>x[0]), interestPairs.map(x=>x[1]));
+
+  renderTopPlaces(rows);
+  renderTagCloud(rows);
+}
+
+// =========================
+// PARSERS
+// =========================
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+function unifyRow(obj){
+  // Accept various column names; map to canonical keys:
+  // lang, region, interest, place, turn3_text
+  const lang = obj.lang ?? obj.language ?? obj.turn0 ?? obj.turn0_lang ?? obj['Turn0'] ?? obj['Turn0_lang'];
+  const region = obj.region ?? obj.turn1 ?? obj.turn1_region ?? obj['Turn1'] ?? obj['Turn1_region'];
+  const interest = obj.interest ?? obj.turn2 ?? obj.turn2_interest ?? obj['Turn2'] ?? obj['Turn2_interest'];
+  const place = obj.place ?? obj.turn15 ?? obj.turn1_5 ?? obj.turn1_5_place ?? obj['Turn1.5'] ?? obj['Turn1_5'] ?? obj['turn1.5'];
+  const turn3_text = obj.turn3_text ?? obj.turn3 ?? obj.turn3_free ?? obj['Turn3'] ?? obj['Turn3_text'] ?? obj['turn3'];
+
+  return {
+    lang: norm(lang),
+    region: norm(region),
+    interest: norm(interest),
+    place: norm(place),
+    turn3_text: turn3_text===null || turn3_text===undefined ? '' : String(turn3_text)
+  };
+}
+
+function parseCSV(text){
+  // simple CSV parser via XLSX for robustness
+  const wb = XLSX.read(text, {type:'string'});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+  return json.map(unifyRow);
+}
+
+async function loadAutoCSV(){
+  setStatus('ok', 'CSVを自動読込しています…');
+  try{
+    const res = await fetch(AUTO_CSV_URL, {cache:'no-store'});
+    if(!res.ok) throw new Error(`fetch failed: ${res.status}`);
+    const buf = await res.arrayBuffer();
+    // Use XLSX read for CSV too
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+    summaries = json.map(unifyRow);
+
+    lastUpdated = new Date();
+    currentSource = AUTO_CSV_URL;
+
+    setStatus('ok', '自動読込完了');
+    updateUIAfterLoad('AUTO');
+  }catch(e){
+    setStatus('warn', '自動読込に失敗しました。ファイルアップロードで読み込めます。');
+    debug.textContent = `AUTO LOAD ERROR: ${e.message}`;
+    dataMode.textContent = 'AUTO (failed)';
+  }
+}
+
+async function loadFile(file){
+  setStatus('ok', 'ファイルを読み込んでいます…');
+  const ext = (file.name.split('.').pop()||'').toLowerCase();
+  const buf = await file.arrayBuffer();
+
+  let json=[];
+  if(ext==='csv'){
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+  }else{
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+  }
+
+  summaries = json.map(unifyRow);
+  lastUpdated = new Date();
+  currentSource = file.name;
+
+  setStatus('ok', 'アップロード読込完了');
+  updateUIAfterLoad('UPLOAD');
+}
+
+// =========================
+// AFTER LOAD
+// =========================
+function updateUIAfterLoad(mode){
+  dataMode.textContent = mode;
+  dataUpdated.textContent = formatDT(lastUpdated);
+  dataRows.textContent = summaries.length;
+  dataSource.textContent = currentSource;
+
+  // fill filters
   fillSelect(fLang, uniqNorm(summaries.map(r=>r.lang)));
   fillSelect(fRegion, uniqNorm(summaries.map(r=>r.region)));
   fillSelect(fInterest, uniqNorm(summaries.map(r=>r.interest)));
 
   applyFilters();
-
-  document.getElementById('applyBtn').addEventListener('click', applyFilters);
-  document.getElementById('resetBtn').addEventListener('click', resetFilters);
-
-  document.getElementById('dlSummaryBtn').addEventListener('click', ()=>{
-    const rows = window.__filteredRows || summaries;
-    downloadText('yaizu_chat_summary_filtered.csv', toCSV(rows, ['conversation_id','lang','region','place','interest','turn3_text','started_at']));
-  });
-
-  document.getElementById('dlSankeyBtn').addEventListener('click', ()=>{
-    const links = window.__filteredSankey || buildSankeyLinks(summaries);
-    downloadText('yaizu_sankey_links_filtered.csv', toCSV(links, ['source','target','value','stage']));
-  });
 }
-init();
+
+// =========================
+// EVENTS
+// =========================
+document.getElementById('btnReset').addEventListener('click', resetFilters);
+document.getElementById('btnReload').addEventListener('click', ()=>loadAutoCSV());
+document.getElementById('btnAuto').addEventListener('click', ()=>loadAutoCSV());
+
+[fLang, fRegion, fInterest].forEach(sel=>sel.addEventListener('change', applyFilters));
+fPlace.addEventListener('input', ()=>{
+  // debounce a bit
+  if(window._t) clearTimeout(window._t);
+  window._t=setTimeout(applyFilters, 150);
+});
+
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  try{
+    await loadFile(f);
+  }catch(err){
+    setStatus('warn', 'ファイル読込に失敗しました');
+    debug.textContent = `UPLOAD ERROR: ${err.message}`;
+  }finally{
+    e.target.value='';
+  }
+});
+
+// =========================
+// INIT
+// =========================
+loadAutoCSV();
 </script>
-
-<script>
-/* =========================
-   EMBED HEIGHT AUTO-RESIZE v4
-   Sends document height to parent via postMessage:
-     { type: 'iframe-height', height: <number> }
-   Parent page should listen and set iframe height.
-   ========================= */
-(function(){
-  var lastH = 0;
-  var scheduled = false;
-
-  function getHeight(){
-    // Use the max of several measurements for robustness
-    var b = document.body;
-    var e = document.documentElement;
-    return Math.max(
-      b ? b.scrollHeight : 0,
-      b ? b.offsetHeight : 0,
-      e ? e.clientHeight : 0,
-      e ? e.scrollHeight : 0,
-      e ? e.offsetHeight : 0
-    );
-  }
-
-  function sendHeight(){
-    scheduled = false;
-    var h = getHeight();
-    if (!h || h === lastH) return;
-    lastH = h;
-    try{
-      window.parent && window.parent.postMessage({ type: 'iframe-height', height: h }, '*');
-    }catch(_){}
-  }
-
-  function scheduleSend(){
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(sendHeight);
-  }
-
-  // Observe DOM changes to keep height in sync when filters change / charts render.
-  var mo = null;
-  if (window.MutationObserver){
-    mo = new MutationObserver(function(){ scheduleSend(); });
-    mo.observe(document.documentElement, { childList:true, subtree:true, attributes:true, characterData:true });
-  }
-
-  window.addEventListener('load', function(){
-    // initial burst (charts render async)
-    scheduleSend();
-    setTimeout(scheduleSend, 200);
-    setTimeout(scheduleSend, 600);
-    setTimeout(scheduleSend, 1200);
-  });
-  window.addEventListener('resize', function(){ scheduleSend(); });
-
-  // Expose for manual calls if needed
-  window.__sendEmbedHeight = scheduleSend;
-})();
-</script>
-
 </body>
 </html>
